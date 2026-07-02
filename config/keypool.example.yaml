@@ -1,0 +1,36 @@
+server:
+  host: 0.0.0.0
+  port: 3000
+
+providers:
+  openai:
+    type: openai
+    baseUrl: https://api.openai.com/v1
+    keys:
+      - id: openai-main-1
+        value: ${OPENAI_API_KEY_1}
+        weight: 10
+        rpm: 500
+        dailyRequests: 10000
+
+pools:
+  text_generation:
+    strategy: weighted_round_robin
+    providers:
+      - provider: openai
+        models:
+          - gpt-4.1-mini
+
+tasks:
+  script_generation:
+    pool: text_generation
+    defaultModel: gpt-4.1-mini
+
+retry:
+  maxAttempts: 3
+  retryOn:
+    - 429
+    - 500
+    - 502
+    - 503
+

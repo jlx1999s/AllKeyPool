@@ -1,0 +1,17 @@
+server:
+  host: 0.0.0.0
+  port: 3000
+
+providers: {}
+pools: {}
+tasks: {}
+
+retry:
+  maxAttempts: 3
+  retryOn:
+    - 429
+    - 500
+    - 502
+    - 503
+    - 504
+

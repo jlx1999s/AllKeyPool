@@ -1,0 +1,21 @@
+{
+  "name": "keypool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A pluggable API key routing and load-balancing gateway for AI production pipelines.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run build -w @keypool/shared && npm run dev -w @keypool/api",
+    "test": "npm run build -w @keypool/shared && npm run test --workspaces",
+    "typecheck": "npm run build -w @keypool/shared && npm run typecheck --workspaces"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "Apache-2.0"
+}
