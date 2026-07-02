@@ -1,20 +1,20 @@
 import type { ApiKeyRecord, SchedulingContext, SchedulingStrategy } from "@keypool/shared";
 import { getEligibleKeys } from "../key-eligibility.js";
 
-export class RoundRobinStrategy implements SchedulingStrategy {
-  readonly name = "round_robin";
+export class WeightedRoundRobinStrategy implements SchedulingStrategy {
+  readonly name = "weighted_round_robin";
 
   private readonly cursors = new Map<string, number>();
 
   async selectKey(context: SchedulingContext, keys: ApiKeyRecord[]): Promise<ApiKeyRecord> {
-    const eligibleKeys = getEligibleKeys(keys);
+    const weightedKeys = expandWeightedKeys(getEligibleKeys(keys));
 
-    if (eligibleKeys.length === 0) {
+    if (weightedKeys.length === 0) {
       throw new Error(`No eligible API keys for pool: ${context.pool}`);
     }
 
     const cursor = this.cursors.get(context.pool) ?? 0;
-    const selectedKey = eligibleKeys[cursor % eligibleKeys.length];
+    const selectedKey = weightedKeys[cursor % weightedKeys.length];
 
     if (!selectedKey) {
       throw new Error(`No eligible API keys for pool: ${context.pool}`);
@@ -25,3 +25,8 @@ export class RoundRobinStrategy implements SchedulingStrategy {
     return selectedKey;
   }
 }
+
+function expandWeightedKeys(keys: ApiKeyRecord[]): ApiKeyRecord[] {
+  return keys.flatMap((key) => Array.from({ length: Math.max(1, key.weight) }, () => key));
+}
+

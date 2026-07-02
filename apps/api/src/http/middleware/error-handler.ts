@@ -2,12 +2,17 @@ import type { FastifyInstance } from "fastify";
 
 export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error, request, reply) => {
-    request.log.error({ err: error }, "Request failed");
-
     const normalizedError = normalizeError(error);
     const statusCode = normalizedError.statusCode && normalizedError.statusCode >= 400
       ? normalizedError.statusCode
       : 500;
+    const logPayload = { err: error };
+
+    if (statusCode >= 500) {
+      request.log.error(logPayload, "Request failed");
+    } else {
+      request.log.warn(logPayload, "Request failed");
+    }
 
     void reply.status(statusCode).send({
       error: {

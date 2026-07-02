@@ -13,10 +13,10 @@ KeyPool/
 ├── apps/
 │   └── api/                     # Fastify HTTP service (entrypoint)
 │       ├── src/
-│       │   ├── adapters/        # Provider adapters (openai, anthropic, …)
 │       │   ├── config/          # YAML loader + Zod schema
 │       │   ├── core/            # Scheduler, strategies, breaker, ratelimit
 │       │   ├── http/            # Routes + middleware
+│       │   ├── providers/       # Provider registry and adapters
 │       │   ├── security/        # Secret redaction
 │       │   ├── storage/         # Key state store
 │       │   └── main.ts
@@ -35,11 +35,10 @@ Requires Node ≥ 20.
 
 ```bash
 npm install
-npm run build -w @keypool/shared   # build shared types first
-npm run dev -w @keypool/api        # start the API on :3000
+npm run dev                        # build shared types and start the API on :3000
 ```
 
-Set `KEYPOOL_CONFIG=./config/keypool.yaml` and provide at least one API key in your env (e.g. `OPENAI_API_KEY_1`).
+Set `KEYPOOL_CONFIG=./config/keypool.yaml` when using a non-default config path. Provider keys should be supplied through environment placeholders such as `${OPENAI_API_KEY_1}`.
 
 ## Scripts
 
@@ -79,9 +78,9 @@ Closes #42
 
 ## Adding a new provider adapter
 
-1. Create `apps/api/src/adapters/<name>.ts`.
-2. Implement the `Provider` interface (see `packages/shared/src/types/provider.ts`).
-3. Register it in `apps/api/src/adapters/registry.ts`.
+1. Create `apps/api/src/providers/<name>/<name>.adapter.ts`.
+2. Implement the `ProviderAdapter` interface (see `packages/shared/src/types/provider.ts`).
+3. Register it through `apps/api/src/providers/provider-registry.ts`.
 4. Add the provider name as a Zod enum in `apps/api/src/config/schema.ts`.
 5. Add an example block in `config/keypool.example.yaml`.
 6. Write at least one happy-path and one error-classification test.
@@ -89,7 +88,7 @@ Closes #42
 ## Adding a new scheduling strategy
 
 1. Create `apps/api/src/core/scheduler/strategies/<name>.strategy.ts`.
-2. Implement the `Strategy` interface.
+2. Implement the `SchedulingStrategy` interface.
 3. Add the strategy name as a Zod enum.
 4. Cover with unit tests across at least: empty pool, single key, weighted distribution.
 

@@ -6,6 +6,7 @@ function key(id: string, status: ApiKeyRecord["status"] = "healthy"): ApiKeyReco
   return {
     id,
     provider: "openai",
+    pool: "text_generation",
     value: "secret",
     weight: 1,
     status,
@@ -32,4 +33,3 @@ describe("RoundRobinStrategy", () => {
       .resolves.toMatchObject({ id: "key-3" });
   });
 });
-

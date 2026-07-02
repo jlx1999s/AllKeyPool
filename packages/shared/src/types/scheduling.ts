@@ -6,6 +6,7 @@ export interface SchedulingContext {
   provider?: string;
   model?: string;
   task?: string;
+  excludedKeyIds?: string[];
 }
 
 export interface SchedulingStrategy {
@@ -13,3 +14,7 @@ export interface SchedulingStrategy {
   selectKey(context: SchedulingContext, keys: ApiKeyRecord[]): Promise<ApiKeyRecord>;
 }
 
+export interface SchedulingResult {
+  key: ApiKeyRecord;
+  strategy: string;
+}

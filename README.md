@@ -19,17 +19,23 @@ KeyPool does exactly one thing — **pick the right key, for the right task, at 
 | | Feature | Status |
 |---|---|---|
 | 🔁 | Round-robin key selection | ✅ done |
-| ⚖️ | Weighted round-robin | ⏳ v0.2 |
+| ⚖️ | Weighted round-robin | ✅ done |
+| 🧭 | Scheduler orchestrator | ✅ key selection done |
+| 🧰 | In-memory key repository | ✅ done |
+| 🧱 | Provider registry | ✅ done |
 | 🎯 | Sticky session (role consistency) | ⏳ v0.3 |
-| 🚦 | Per-key RPM / TPM rate limiting | ⏳ v0.2 |
+| 🚦 | Per-key RPM rate limiting | ✅ in-memory done |
+| 🚦 | Per-key TPM rate limiting | ⏳ v0.3 |
 | 💥 | Circuit breaker | ⏳ v0.3 |
-| 🧬 | OpenAI-compatible pass-through | ⏳ v0.2 |
+| 🧬 | OpenAI-compatible chat pass-through | ✅ basic done |
+| 🔁 | RetryPolicy + ProviderRequestExecutor | ✅ basic done |
+| 🛠️ | Token-protected admin console | ✅ basic done |
 | 🪜 | Provider fallback chain | ⏳ v0.3 |
 | 📊 | Prometheus metrics | ⏳ v0.3 |
-| 🧱 | Multi-provider (Anthropic, Gemini, custom) | ⏳ v0.2 |
+| 🧩 | Multi-provider adapters (Anthropic, Gemini, custom) | ⏳ v0.2 |
 | 🗂️ | SQLite / Postgres / Redis storage | ⏳ v0.6 |
 | 🔌 | Python / TS SDKs | ⏳ v0.7 |
-| 🌐 | Minimal admin web UI | ⏳ v0.7 |
+| 🌐 | Production admin web UI | ✅ basic done |
 
 ---
 
@@ -97,23 +103,35 @@ cd AllKeyPool
 
 npm install
 
-# build shared types first
-npm run build -w @keypool/shared
-
-# copy & edit the example config
-cp config/keypool.example.yaml config/keypool.yaml
-
-# at least one provider key in your environment
-export OPENAI_API_KEY_1=sk-...
-
 # start the API
-npm run dev -w @keypool/api
+npm run dev
 ```
 
 The service listens on `:3000` by default.
 
 ```bash
-curl http://localhost:3000/healthz
+curl http://localhost:3000/health
+```
+
+Admin console:
+
+[http://localhost:3000/admin](http://localhost:3000/admin)
+
+Set `KEYPOOL_ADMIN_TOKEN` in production. When it is not set, local development uses the fallback token `keypool-admin-dev`.
+
+The admin console can inspect runtime config, add in-memory OpenAI-compatible keys, enable/disable/delete keys, and run health/chat tests. Runtime additions are not persisted to YAML yet.
+
+Provider presets are available when adding keys, so common vendors can be selected without manually filling every field. Current presets:
+
+- OpenAI Compatible: `https://api.openai.com/v1`, `gpt-4.1-mini`
+- MiniMax Official: `https://api.minimax.io/v1`, `MiniMax-M3`
+
+OpenAI-compatible chat endpoint:
+
+```bash
+curl http://localhost:3000/v1/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"hello"}]}'
 ```
 
 ---

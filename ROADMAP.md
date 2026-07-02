@@ -17,21 +17,36 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ Fastify 5 + Pino + Zod + Vitest + tsx toolchain
 - ✅ YAML config loader with `${ENV}` expansion
 - ✅ Round-robin scheduling strategy
-- ✅ Health check route (`/healthz`)
+- ✅ Weighted round-robin scheduling strategy
+- ✅ Health check route (`/health`)
 - ✅ Structured logging with secret redaction
-- 🚧 Provider registry & OpenAI-compatible adapter
-- 🚧 Scheduler orchestrator (key selection + retry)
-- 🚧 Pool→Provider→Key dispatch
+- ✅ Provider registry
+- ✅ Scheduler orchestrator (key selection)
+- ✅ In-memory key state store
+- ✅ Pool→Provider→Key dispatch
+- ✅ OpenAI-compatible adapter
+- ✅ `POST /v1/chat/completions`
+- ✅ Retry orchestration for retryable provider errors
+- ✅ RetryPolicy abstraction
+- ✅ ProviderRequestExecutor abstraction
+- ✅ In-memory per-key RPM quota manager
+- ✅ Token-protected admin console (`/admin`)
+- ✅ Admin API auth via bearer token
+- ✅ Runtime in-memory key add/update from admin console
+- ✅ Key enable/disable/delete controls
+- ✅ Admin health and chat tests
 
 ---
 
 ## v0.2 — Real LLM traffic
-- ⏳ OpenAI-compatible HTTP adapter (`apps/api/src/adapters/openai.ts`)
-- ⏳ `POST /v1/chat/completions` route (OpenAI-compatible pass-through)
-- ⏳ Error classification (RateLimit / Auth / QuotaExhaust / Server / Client / Network)
-- ⏳ Weighted round-robin strategy
-- ⏳ Per-key RPM / TPM rate limiting (token bucket)
-- ⏳ In-memory key state store (`storage/memory.ts`)
+- ✅ OpenAI-compatible HTTP adapter (`apps/api/src/providers/openai/openai.adapter.ts`)
+- ✅ `POST /v1/chat/completions` route (OpenAI-compatible pass-through)
+- ✅ Basic error classification (RateLimit / Auth / Server / Client / Network)
+- ✅ Weighted round-robin strategy
+- ✅ Retry with another eligible key for retryable provider errors
+- ✅ Per-key RPM rate limiting (in-memory fixed window)
+- ⏳ Per-key TPM rate limiting
+- ✅ In-memory key state store
 
 ## v0.3 — Resilience
 - ⏳ Circuit breaker (Closed / Open / Half-Open)
@@ -39,6 +54,18 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ⏳ Cooldown & auto-recovery for failing keys
 - ⏳ Prometheus `/metrics` endpoint
 - ⏳ HTTP client with retry, backoff, timeout
+
+## v0.3.5 — Admin console
+- ✅ Runtime overview: providers, pools, keys
+- ✅ In-memory key add/update
+- ✅ Provider presets for key creation
+- ✅ MiniMax official OpenAI-compatible preset
+- ✅ Bearer-token protected admin APIs
+- ✅ Key enable/disable/delete
+- ✅ Health test
+- ✅ OpenAI-compatible chat test
+- ⏳ Persist config changes safely
+- ⏳ Usage and health event timeline
 
 ## v0.4 — Task-level API
 - ⏳ `tasks.*` registry — script / storyboard / image / video / tts / review
@@ -50,7 +77,8 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ⏳ OpenTelemetry tracing
 - ⏳ Grafana JSON dashboard
 - ⏳ Structured audit log per request
-- ⏳ Admin API (`/admin/keys`, `/admin/usage`)
+- ✅ Admin API for runtime key management
+- ⏳ Admin usage API
 - ⏳ Key encryption at rest (AES-GCM)
 
 ## v0.6 — Storage & multi-instance
@@ -62,7 +90,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 ## v0.7 — SDKs
 - ⏳ Python SDK (`@keypool/sdk-python`)
 - ⏳ TS SDK (`@keypool/sdk-ts` first-class package)
-- ⏳ Minimal web admin UI (React/Vue)
+- ✅ Minimal web admin UI
 
 ## v1.0 — Production hardening
 - ⏳ Complete e2e test suite
