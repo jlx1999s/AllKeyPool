@@ -8,6 +8,37 @@
 
 ---
 
+## TL;DR（极简版本 — 日常会话用）
+
+| 步骤 | 谁做 | 做什么 |
+|---|---|---|
+| 1 | Agent | 写代码 → `git add` → `git commit` |
+| 2 | 你 | 去 GitHub 看 PR → Merge pull request（Squash and merge） |
+| 3 | 你 | 跑 `git pull origin main` 让两个本地目录同步 |
+
+**就这样。** 三个动作每天反复。如果你只想记一件事：
+
+> **Agent commit → 你在 GitHub 上合并 → 你跑 pull 同步两边。**
+
+---
+
+## pull vs rebase 速查表
+
+| 场景 | 用什么？ | 在哪个目录跑？ |
+|---|---|---|
+| 你刚合并一个 PR，main 前进了 | `git pull origin main` | 两个目录（`KeyPool/` 和 `KeyPool-claude/`） |
+| Agent 正在写代码，main 又前进了 | `git fetch origin main && git rebase origin/main` | Agent 自己的工作目录（在它的 feature 分支上） |
+| Agent 没在写代码，所有 PR 都合并了 | `git pull origin main` | 两个目录 |
+| Agent 第一次基于新 main 拉分支 | 先 `git fetch origin main && git rebase origin/main`，再 checkout -b | Agent 自己的工作目录 |
+
+**关键心法**：
+- 你本地 main **永远不会有本地 commit**（Agent 不能 push main，Branch Protection 强制走 PR）
+- 所以本地 main 永远落后于 origin/main
+- `pull` = 把 origin/main 同步到本地 main = `merge`，简单
+- `rebase` = 把当前分支的 commit 重演在最新 main 之上，**只在你正在写代码时用**
+
+---
+
 ## 目录
 
 - 0. 一次性环境准备
@@ -398,20 +429,20 @@ GitHub 上 PR 会自动刷新为 "Mergeable"。
 
 ### 6.1 当前 PR 全部合并后
 
-```bash
-# Claude 工作目录同步 main
-cd ~/Desktop/KeyPool-claude
-git fetch origin
-git checkout main
-git rebase origin/main
-git checkout feature/claude-backend
-git rebase origin/main
+合并后**默认用 `git pull`，不要 `git rebase`**。原因：
+- 你的本地 main 没有本地 commit（Agent 不能直推 main，Branch Protection 强制走 PR）
+- origin/main 比本地 main 新（你刚合并 PR）
+- `pull` = fetch + merge，刚好对得上
 
-# Codex 工作目录同步
-cd ~/Desktop/KeyPool
-git fetch origin
-git rebase origin/main
+```bash
+# 同步 Codex 工作目录（默认在 main）
+cd ~/Desktop/KeyPool && git pull origin main
+
+# 同步 Claude 工作目录（默认在 main）
+cd ~/Desktop/KeyPool-claude && git pull origin main
 ```
+
+如果 Agent 在写代码期间 main 进了一步，Agent 需要 `rebase`（详见速查表）。
 
 ### 6.2 下一次迭代开始
 
@@ -548,8 +579,8 @@ git diff origin/main..feature/claude-<topic>
 gh pr merge <number> --squash  # 推荐 squash merge
 
 # 同步本地
-cd ~/Desktop/KeyPool && git fetch && git rebase origin/main
-cd ~/Desktop/KeyPool-claude && git fetch && git rebase origin/main
+cd ~/Desktop/KeyPool && git pull origin main
+cd ~/Desktop/KeyPool-claude && git pull origin main
 ```
 
 ---
