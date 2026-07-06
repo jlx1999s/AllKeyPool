@@ -79,6 +79,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ Empty states with primary CTAs
 - ✅ Stat grids with auto-fit layout
 - ✅ Settings page (auth, runtime, OpenAPI reference)
+- ✅ Admin panel template split into i18n / styles / script / HTML modules
 
 ## v0.2.8 — i18n
 - ✅ EN + zh-CN dictionaries, ~150 translation keys
