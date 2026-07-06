@@ -248,6 +248,33 @@ describe("admin routes", () => {
     ]);
     expect(JSON.stringify(auditResponse.json())).not.toContain("sk-test-secret");
 
+    const filteredAuditResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/audit-logs?action=key_status_changed&outcome=success&targetId=openai-prod-1&limit=5",
+      headers: adminHeaders
+    });
+    expect(filteredAuditResponse.statusCode).toBe(200);
+    expect(filteredAuditResponse.json().auditLogs).toEqual([
+      expect.objectContaining({
+        action: "key_status_changed",
+        targetId: "openai-prod-1",
+        outcome: "success",
+        metadata: expect.objectContaining({
+          previousStatus: "disabled",
+          status: "healthy"
+        })
+      }),
+      expect.objectContaining({
+        action: "key_status_changed",
+        targetId: "openai-prod-1",
+        outcome: "success",
+        metadata: expect.objectContaining({
+          previousStatus: "healthy",
+          status: "disabled"
+        })
+      })
+    ]);
+
     state = (await app.inject({
       method: "GET",
       url: "/admin/api/state",

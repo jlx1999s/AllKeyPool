@@ -1,7 +1,7 @@
 import type { ApiKeyRecord } from "@keypool/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import type { AuditActor } from "../../observability/audit-log-recorder.js";
+import type { AuditActor, AuditLogQuery } from "../../observability/audit-log-recorder.js";
 import { findProviderPreset, providerPresets } from "../../providers/provider-presets.js";
 import {
   restoreRuntimeConfigFromKeys,
@@ -57,8 +57,16 @@ const healthEventsQuerySchema = z.object({
 });
 
 const auditLogsQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(200).default(50)
+  limit: z.coerce.number().int().positive().max(200).default(50),
+  action: z.enum(["key_created", "key_updated", "key_status_changed", "key_deleted"]).optional(),
+  actorType: z.enum(["admin", "system"]).optional(),
+  actorId: z.string().min(1).optional(),
+  targetType: z.string().min(1).optional(),
+  targetId: z.string().min(1).optional(),
+  outcome: z.enum(["success", "error"]).optional()
 });
+
+type AuditLogsQueryRequest = z.infer<typeof auditLogsQuerySchema>;
 
 const keyUsageQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(256).default(64)
@@ -119,7 +127,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/admin/api/audit-logs", async (request) => {
     const query = auditLogsQuerySchema.parse(request.query);
     return {
-      auditLogs: await app.auditLogRecorder.listRecent(query.limit)
+      auditLogs: await app.auditLogRecorder.listRecent(toAuditLogQuery(query))
     };
   });
 
@@ -127,7 +135,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const keys = await app.apiKeyRepository.list();
     const recentUsage = await app.usageRecorder.listRecent(500);
     const recentHealthEvents = await app.healthEventRecorder.listRecent(20);
-    const recentAuditLogs = await app.auditLogRecorder.listRecent(20);
+    const recentAuditLogs = await app.auditLogRecorder.listRecent({ limit: 20 });
     const usageSnapshot = buildUsageSnapshot(recentUsage);
 
     return {
@@ -411,6 +419,21 @@ function getAdminActor(): AuditActor {
     type: "admin",
     id: "admin"
   };
+}
+
+function toAuditLogQuery(input: AuditLogsQueryRequest): AuditLogQuery {
+  const query: AuditLogQuery = {
+    limit: input.limit
+  };
+
+  if (input.action !== undefined) query.action = input.action;
+  if (input.actorType !== undefined) query.actorType = input.actorType;
+  if (input.actorId !== undefined) query.actorId = input.actorId;
+  if (input.targetType !== undefined) query.targetType = input.targetType;
+  if (input.targetId !== undefined) query.targetId = input.targetId;
+  if (input.outcome !== undefined) query.outcome = input.outcome;
+
+  return query;
 }
 
 function keyConfigAuditMetadata(input: ResolvedUpsertKeyRequest): Record<string, unknown> {

@@ -127,6 +127,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ⏳ OpenTelemetry tracing
 - ⏳ Grafana JSON dashboard
 - ✅ Admin operation audit log
+- ✅ Admin audit log filtering
 - ⏳ Structured audit log per request
 - ✅ Admin API for runtime key management
 - ✅ Admin usage API

@@ -25,9 +25,19 @@ export interface AuditLog {
   createdAt: Date;
 }
 
+export interface AuditLogQuery {
+  limit?: number;
+  action?: AuditAction;
+  actorType?: AuditActorType;
+  actorId?: string;
+  targetType?: string;
+  targetId?: string;
+  outcome?: AuditOutcome;
+}
+
 export interface AuditLogRecorder {
   record(entry: Omit<AuditLog, "id" | "createdAt">): Promise<AuditLog>;
-  listRecent(limit?: number): Promise<AuditLog[]>;
+  listRecent(query?: AuditLogQuery): Promise<AuditLog[]>;
 }
 
 export class InMemoryAuditLogRecorder implements AuditLogRecorder {
@@ -54,7 +64,20 @@ export class InMemoryAuditLogRecorder implements AuditLogRecorder {
     return auditLog;
   }
 
-  async listRecent(limit = 50): Promise<AuditLog[]> {
-    return this.entries.slice(0, limit);
+  async listRecent(query: AuditLogQuery = {}): Promise<AuditLog[]> {
+    const limit = query.limit ?? 50;
+    return this.entries
+      .filter((entry) => matchesAuditLogQuery(entry, query))
+      .slice(0, limit);
   }
+}
+
+function matchesAuditLogQuery(entry: AuditLog, query: AuditLogQuery): boolean {
+  if (query.action !== undefined && entry.action !== query.action) return false;
+  if (query.actorType !== undefined && entry.actor.type !== query.actorType) return false;
+  if (query.actorId !== undefined && entry.actor.id !== query.actorId) return false;
+  if (query.targetType !== undefined && entry.targetType !== query.targetType) return false;
+  if (query.targetId !== undefined && entry.targetId !== query.targetId) return false;
+  if (query.outcome !== undefined && entry.outcome !== query.outcome) return false;
+  return true;
 }

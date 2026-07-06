@@ -140,6 +140,7 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
         el.classList.toggle("active", el.dataset.page === r);
       });
       if (r === "usage") refreshUsage();
+      if (r === "settings") renderAuditLogs();
       if (r === "overview") renderOverview();
     }
     window.addEventListener("hashchange", renderRoute);
@@ -381,6 +382,29 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
     }
     function countKeysInPool(name) { return state.keys.filter((k) => k.pool === name).length; }
 
+    async function refreshAuditLogs() {
+      try {
+        const query = buildAuditLogQueryString();
+        const data = await requestJson("/admin/api/audit-logs" + query);
+        state.auditLogs = data.auditLogs || [];
+        renderAuditLogs();
+      } catch (err) {
+        toast(t("settings.audit.err.load", { msg: err.message }), "danger");
+      }
+    }
+
+    function buildAuditLogQueryString() {
+      const params = new URLSearchParams();
+      params.set("limit", "50");
+      const action = $("settings-audit-action-filter").value;
+      const outcome = $("settings-audit-outcome-filter").value;
+      const targetId = $("settings-audit-target-filter").value.trim();
+      if (action) params.set("action", action);
+      if (outcome) params.set("outcome", outcome);
+      if (targetId) params.set("targetId", targetId);
+      return "?" + params.toString();
+    }
+
     function renderAuditLogs() {
       const tbody = $("settings-audit-body");
       if (!tbody) return;
@@ -401,6 +425,12 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
           + '</tr>';
       }).join("");
     }
+    $("settings-audit-refresh").addEventListener("click", refreshAuditLogs);
+    $("settings-audit-action-filter").addEventListener("change", refreshAuditLogs);
+    $("settings-audit-outcome-filter").addEventListener("change", refreshAuditLogs);
+    $("settings-audit-target-filter").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") refreshAuditLogs();
+    });
 
     async function refreshUsage() {
       try {

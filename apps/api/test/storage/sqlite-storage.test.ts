@@ -148,6 +148,17 @@ describe("SQLite storage", () => {
         pool: "text_generation"
       }
     });
+    await auditLogRecorder.record({
+      action: "key_deleted",
+      actor: {
+        type: "admin",
+        id: "admin"
+      },
+      targetType: "api_key",
+      targetId: "key-2",
+      outcome: "error",
+      message: "API key delete failed"
+    });
 
     await expect(usageRecorder.listRecent()).resolves.toEqual([
       expect.objectContaining({
@@ -169,6 +180,12 @@ describe("SQLite storage", () => {
     ]);
     await expect(auditLogRecorder.listRecent()).resolves.toEqual([
       expect.objectContaining({
+        action: "key_deleted",
+        targetId: "key-2",
+        outcome: "error",
+        createdAt: expect.any(Date) as Date
+      }),
+      expect.objectContaining({
         action: "key_created",
         actor: {
           type: "admin",
@@ -182,6 +199,17 @@ describe("SQLite storage", () => {
           pool: "text_generation"
         },
         createdAt: expect.any(Date) as Date
+      })
+    ]);
+    await expect(auditLogRecorder.listRecent({
+      action: "key_created",
+      outcome: "success",
+      targetId: "key-1"
+    })).resolves.toEqual([
+      expect.objectContaining({
+        action: "key_created",
+        targetId: "key-1",
+        outcome: "success"
       })
     ]);
 

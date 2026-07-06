@@ -183,6 +183,13 @@ curl 'http://localhost:3000/admin/api/audit-logs?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
+Audit logs can be filtered by `action`, `outcome`, `targetType`, `targetId`, `actorType`, and `actorId`:
+
+```bash
+curl 'http://localhost:3000/admin/api/audit-logs?action=key_status_changed&outcome=success&targetId=minimax-prod-1' \
+  -H 'authorization: Bearer keypool-admin-dev'
+```
+
 Key health policy:
 
 - First consecutive provider failure marks a key as `degraded`.

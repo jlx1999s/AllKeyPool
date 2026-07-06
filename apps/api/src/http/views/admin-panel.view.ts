@@ -425,6 +425,27 @@ ${ADMIN_PANEL_CSS}
                 <h2 data-i18n="settings.audit.title">Audit log</h2>
                 <p class="muted" style="margin: 4px 0 0; font-size: 13px;" data-i18n="settings.audit.desc">Recent admin operations.</p>
               </div>
+              <div class="actions">
+                <button class="btn btn-secondary btn-sm" id="settings-audit-refresh" data-i18n="settings.audit.refresh">Refresh audit</button>
+              </div>
+            </div>
+            <div class="table-toolbar">
+              <select class="filter-select" id="settings-audit-action-filter">
+                <option value="" data-i18n="settings.audit.filter.allAction">All actions</option>
+                <option value="key_created">key_created</option>
+                <option value="key_updated">key_updated</option>
+                <option value="key_status_changed">key_status_changed</option>
+                <option value="key_deleted">key_deleted</option>
+              </select>
+              <select class="filter-select" id="settings-audit-outcome-filter">
+                <option value="" data-i18n="settings.audit.filter.allOutcome">All outcomes</option>
+                <option value="success">success</option>
+                <option value="error">error</option>
+              </select>
+              <div class="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                <input id="settings-audit-target-filter" data-i18n-placeholder="settings.audit.filter.targetPlaceholder" placeholder="Filter target id…">
+              </div>
             </div>
             <div class="table-wrap">
               <table class="data">

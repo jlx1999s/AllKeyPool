@@ -3,6 +3,7 @@ import type {
   AuditAction,
   AuditActorType,
   AuditLog,
+  AuditLogQuery,
   AuditLogRecorder,
   AuditOutcome
 } from "./audit-log-recorder.js";
@@ -52,12 +53,41 @@ export class SqliteAuditLogRecorder implements AuditLogRecorder {
     return auditLog;
   }
 
-  async listRecent(limit = 50): Promise<AuditLog[]> {
+  async listRecent(query: AuditLogQuery = {}): Promise<AuditLog[]> {
+    const limit = query.limit ?? 50;
+    const filters = buildWhereClause(query);
+
     return this.database
-      .prepare("SELECT * FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?")
-      .all(limit)
+      .prepare(`SELECT * FROM audit_logs ${filters.whereSql} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .all(...filters.params, limit)
       .map((row) => rowToAuditLog(row as unknown as AuditLogRow));
   }
+}
+
+function buildWhereClause(query: AuditLogQuery): {
+  whereSql: string;
+  params: string[];
+} {
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  addFilter(clauses, params, "action", query.action);
+  addFilter(clauses, params, "actor_type", query.actorType);
+  addFilter(clauses, params, "actor_id", query.actorId);
+  addFilter(clauses, params, "target_type", query.targetType);
+  addFilter(clauses, params, "target_id", query.targetId);
+  addFilter(clauses, params, "outcome", query.outcome);
+
+  return {
+    whereSql: clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`,
+    params
+  };
+}
+
+function addFilter(clauses: string[], params: string[], column: string, value: string | undefined): void {
+  if (value === undefined) return;
+  clauses.push(`${column} = ?`);
+  params.push(value);
 }
 
 function rowToAuditLog(row: AuditLogRow): AuditLog {
