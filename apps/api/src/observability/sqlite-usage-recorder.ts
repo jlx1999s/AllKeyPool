@@ -55,7 +55,7 @@ export class SqliteUsageRecorder implements UsageRecorder {
     const filters = buildWhereClause(query);
 
     return this.database
-      .prepare(`SELECT * FROM usage_records ${filters.whereSql} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .prepare(`SELECT * FROM usage_records ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ?`)
       .all(...filters.params, limit)
       .map((row) => rowToUsageRecord(row as unknown as UsageRecordRow));
   }

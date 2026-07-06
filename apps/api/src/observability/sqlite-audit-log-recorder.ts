@@ -58,7 +58,7 @@ export class SqliteAuditLogRecorder implements AuditLogRecorder {
     const filters = buildWhereClause(query);
 
     return this.database
-      .prepare(`SELECT * FROM audit_logs ${filters.whereSql} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .prepare(`SELECT * FROM audit_logs ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ?`)
       .all(...filters.params, limit)
       .map((row) => rowToAuditLog(row as unknown as AuditLogRow));
   }

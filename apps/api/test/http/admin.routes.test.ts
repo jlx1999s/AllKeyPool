@@ -38,6 +38,9 @@ describe("admin routes", () => {
     expect(adminResponse.statusCode).toBe(200);
     expect(adminResponse.headers["content-type"]).toContain("text/html");
     expect(adminResponse.body).toContain("KeyPool Console");
+    expect(adminResponse.body).toContain("usage-events-body");
+    expect(adminResponse.body).toContain("health-events-body");
+    expect(adminResponse.body).toContain("usage-event-provider-filter");
     expect(devResponse.statusCode).toBe(302);
     expect(devResponse.headers.location).toBe("/admin");
 

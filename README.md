@@ -125,7 +125,7 @@ Admin console:
 
 Set `KEYPOOL_ADMIN_TOKEN` in production. When it is not set, local development uses the fallback token `keypool-admin-dev`.
 
-The admin console can inspect runtime config, add OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage, health events, audit logs, and run health/chat tests.
+The admin console can inspect runtime config, add OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage, filter raw usage and health events, review audit logs, and run health/chat tests.
 
 By default KeyPool uses in-memory storage for local development. Enable SQLite persistence for runtime keys, usage records, health events, and audit logs:
 
@@ -169,7 +169,7 @@ curl 'http://localhost:3000/admin/api/usage?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
-Usage can be filtered by `route`, `model`, `pool`, `provider`, `keyId`, `outcome`, and `errorCode`.
+Usage can be filtered by `route`, `model`, `pool`, `provider`, `keyId`, `outcome`, and `errorCode`. The Usage page exposes the common `outcome`, `provider`, and `keyId` filters directly in the admin console.
 
 Recent health events API:
 
@@ -178,7 +178,7 @@ curl 'http://localhost:3000/admin/api/health-events?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
-Health events can be filtered by `type`, `level`, `requestId`, `provider`, `keyId`, and `code`.
+Health events can be filtered by `type`, `level`, `requestId`, `provider`, `keyId`, and `code`. The Usage page exposes `type`, `level`, and `keyId` filters for quick incident triage.
 
 Recent admin audit log API:
 

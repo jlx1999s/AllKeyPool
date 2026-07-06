@@ -367,6 +367,90 @@ ${ADMIN_PANEL_CSS}
               </table>
             </div>
           </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="usage.events.title">Recent request events</h2>
+                <p class="muted" style="margin: 4px 0 0; font-size: 13px;" data-i18n="usage.events.desc">Filter raw usage records by key, provider, or outcome.</p>
+              </div>
+            </div>
+            <div class="table-toolbar">
+              <select class="filter-select" id="usage-event-outcome-filter">
+                <option value="" data-i18n="usage.filter.allOutcome">All outcomes</option>
+                <option value="success">success</option>
+                <option value="error">error</option>
+              </select>
+              <select class="filter-select" id="usage-event-provider-filter">
+                <option value="" data-i18n="usage.filter.allProvider">All providers</option>
+              </select>
+              <div class="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                <input id="usage-event-key-filter" data-i18n-placeholder="usage.filter.keyPlaceholder" placeholder="Filter key id…">
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th data-i18n="usage.col.time">Time</th>
+                    <th data-i18n="usage.col.key">Key</th>
+                    <th data-i18n="usage.col.provider">Provider</th>
+                    <th data-i18n="usage.col.model">Model</th>
+                    <th data-i18n="usage.col.status">Status</th>
+                    <th class="num" data-i18n="usage.col.latency">Latency</th>
+                  </tr>
+                </thead>
+                <tbody id="usage-events-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="usage.health.title">Health events</h2>
+                <p class="muted" style="margin: 4px 0 0; font-size: 13px;" data-i18n="usage.health.desc">Provider and key health transitions.</p>
+              </div>
+            </div>
+            <div class="table-toolbar">
+              <select class="filter-select" id="health-event-type-filter">
+                <option value="" data-i18n="usage.filter.allType">All event types</option>
+                <option value="provider_attempt_succeeded">provider_attempt_succeeded</option>
+                <option value="provider_attempt_failed">provider_attempt_failed</option>
+                <option value="key_exhausted">key_exhausted</option>
+                <option value="key_degraded">key_degraded</option>
+                <option value="key_cooling_down">key_cooling_down</option>
+                <option value="key_recovered">key_recovered</option>
+                <option value="key_status_changed">key_status_changed</option>
+              </select>
+              <select class="filter-select" id="health-event-level-filter">
+                <option value="" data-i18n="usage.filter.allLevel">All levels</option>
+                <option value="info">info</option>
+                <option value="warn">warn</option>
+                <option value="error">error</option>
+              </select>
+              <div class="search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                <input id="health-event-key-filter" data-i18n-placeholder="usage.filter.keyPlaceholder" placeholder="Filter key id…">
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th data-i18n="usage.col.time">Time</th>
+                    <th data-i18n="usage.col.type">Type</th>
+                    <th data-i18n="usage.col.level">Level</th>
+                    <th data-i18n="usage.col.key">Key</th>
+                    <th data-i18n="usage.col.code">Code</th>
+                    <th data-i18n="usage.col.message">Message</th>
+                  </tr>
+                </thead>
+                <tbody id="health-events-body"></tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
         <section class="page" data-page="settings">

@@ -59,7 +59,7 @@ export class SqliteHealthEventRecorder implements HealthEventRecorder {
     const filters = buildWhereClause(query);
 
     return this.database
-      .prepare(`SELECT * FROM health_events ${filters.whereSql} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .prepare(`SELECT * FROM health_events ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ?`)
       .all(...filters.params, limit)
       .map((row) => rowToHealthEvent(row as unknown as HealthEventRow));
   }

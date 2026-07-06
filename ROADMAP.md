@@ -116,6 +116,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ Cooldown expiry and auto-recovery
 - ⏳ Persist config changes safely
 - ✅ Usage and health event filtering
+- ✅ Admin Usage page event filter panels
 
 ## v0.4 — Task-level API
 - ⏳ `tasks.*` registry — script / storyboard / image / video / tts / review
