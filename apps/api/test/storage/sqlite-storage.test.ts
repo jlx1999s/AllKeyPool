@@ -3,6 +3,7 @@ import { openSqliteDatabase } from "../../src/storage/sqlite/sqlite-connection.j
 import { createSqliteApiKeyRepository } from "../../src/storage/repositories/sqlite-api-key.repository.js";
 import { SqliteHealthEventRecorder } from "../../src/observability/sqlite-health-event-recorder.js";
 import { SqliteUsageRecorder } from "../../src/observability/sqlite-usage-recorder.js";
+import { AesGcmKeyEncryption } from "../../src/security/key-encryption.js";
 
 function emptyConfig() {
   return {
@@ -69,6 +70,35 @@ describe("SQLite storage", () => {
       })
     ]);
     expect(releasedKeys[0]).not.toHaveProperty("coolingDownUntil");
+
+    database.close();
+  });
+
+  it("encrypts API key values at rest when key encryption is configured", async () => {
+    const database = openSqliteDatabase({ path: ":memory:" });
+    const repository = await createSqliteApiKeyRepository(
+      database,
+      emptyConfig(),
+      new AesGcmKeyEncryption("test-encryption-secret")
+    );
+
+    await repository.upsert({
+      id: "key-1",
+      provider: "openai",
+      pool: "text_generation",
+      value: "sk-test-secret",
+      weight: 1,
+      status: "healthy",
+      failureCount: 0
+    });
+
+    const raw = database.prepare("SELECT value FROM api_keys WHERE id = ?").get("key-1") as { value: string };
+    expect(raw.value).not.toBe("sk-test-secret");
+    expect(raw.value).toMatch(/^kpenc:v1:/);
+    await expect(repository.findById("key-1")).resolves.toMatchObject({
+      id: "key-1",
+      value: "sk-test-secret"
+    });
 
     database.close();
   });

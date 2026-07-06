@@ -134,6 +134,12 @@ KEYPOOL_STORAGE=sqlite KEYPOOL_SQLITE_PATH=./data/keypool.db npm run dev
 
 YAML remains the bootstrap config. Admin-added runtime keys are stored in SQLite with the provider/base URL/model metadata needed to restore routing after restart.
 
+For production, set `KEYPOOL_ENCRYPTION_KEY` so API key values are encrypted at rest in SQLite:
+
+```bash
+KEYPOOL_STORAGE=sqlite KEYPOOL_SQLITE_PATH=./data/keypool.db KEYPOOL_ENCRYPTION_KEY='change-me' npm run dev
+```
+
 Provider presets are available when adding keys, so common vendors can be selected without manually filling every field. Current presets:
 
 - OpenAI Compatible: `https://api.openai.com/v1`, `gpt-4.1-mini`

@@ -1,6 +1,7 @@
 import type { ApiKeyRecord, ApiKeyStatus } from "@keypool/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { KeyPoolConfig } from "../../config/schema.js";
+import { PlainTextKeyEncryption, type KeyEncryption } from "../../security/key-encryption.js";
 import { createApiKeyRecordsFromConfig } from "./in-memory-api-key.repository.js";
 import type { ApiKeyRepository, FindApiKeysOptions } from "./api-key.repository.js";
 import { dateToSql, jsonToSql, sqlToDate, sqlToJson } from "../sqlite/sqlite-serializers.js";
@@ -21,13 +22,16 @@ interface ApiKeyRow {
 }
 
 export class SqliteApiKeyRepository implements ApiKeyRepository {
-  constructor(private readonly database: DatabaseSync) {}
+  constructor(
+    private readonly database: DatabaseSync,
+    private readonly keyEncryption: KeyEncryption = new PlainTextKeyEncryption()
+  ) {}
 
   async list(): Promise<ApiKeyRecord[]> {
     return this.database
       .prepare("SELECT * FROM api_keys ORDER BY id ASC")
       .all()
-      .map((row) => rowToApiKeyRecord(row as unknown as ApiKeyRow));
+      .map((row) => this.rowToApiKeyRecord(row as unknown as ApiKeyRow));
   }
 
   async upsert(key: ApiKeyRecord): Promise<void> {
@@ -50,7 +54,7 @@ export class SqliteApiKeyRepository implements ApiKeyRepository {
         failure_count = excluded.failure_count,
         metadata_json = excluded.metadata_json,
         updated_at = excluded.updated_at
-    `).run(...apiKeyRecordParams(key), new Date().toISOString());
+    `).run(...this.apiKeyRecordParams(key), new Date().toISOString());
   }
 
   async delete(id: string): Promise<boolean> {
@@ -67,12 +71,12 @@ export class SqliteApiKeyRepository implements ApiKeyRepository {
         .prepare("SELECT * FROM api_keys WHERE pool = ? ORDER BY id ASC")
         .all(pool);
 
-    return rows.map((row) => rowToApiKeyRecord(row as unknown as ApiKeyRow));
+    return rows.map((row) => this.rowToApiKeyRecord(row as unknown as ApiKeyRow));
   }
 
   async findById(id: string): Promise<ApiKeyRecord | undefined> {
     const row = this.database.prepare("SELECT * FROM api_keys WHERE id = ?").get(id);
-    return row === undefined ? undefined : rowToApiKeyRecord(row as unknown as ApiKeyRow);
+    return row === undefined ? undefined : this.rowToApiKeyRecord(row as unknown as ApiKeyRow);
   }
 
   async markUsed(id: string, usedAt: Date): Promise<void> {
@@ -120,7 +124,7 @@ export class SqliteApiKeyRepository implements ApiKeyRepository {
     const rows = this.database
       .prepare("SELECT * FROM api_keys WHERE status = 'cooling_down' AND cooling_down_until IS NOT NULL AND cooling_down_until <= ?")
       .all(now.toISOString())
-      .map((row) => rowToApiKeyRecord(row as unknown as ApiKeyRow));
+      .map((row) => this.rowToApiKeyRecord(row as unknown as ApiKeyRow));
 
     this.database.prepare(`
       UPDATE api_keys
@@ -158,32 +162,40 @@ export class SqliteApiKeyRepository implements ApiKeyRepository {
       }
     }
   }
+
+  private apiKeyRecordParams(key: ApiKeyRecord): Array<string | number | null> {
+    return [
+      key.id,
+      key.provider,
+      key.pool,
+      this.keyEncryption.encrypt(key.value),
+      key.weight,
+      key.status,
+      key.rpmLimit ?? null,
+      key.dailyRequestLimit ?? null,
+      dateToSql(key.lastUsedAt),
+      dateToSql(key.coolingDownUntil),
+      key.failureCount,
+      jsonToSql(key.metadata)
+    ];
+  }
+
+  private rowToApiKeyRecord(row: ApiKeyRow): ApiKeyRecord {
+    return rowToApiKeyRecord({
+      ...row,
+      value: this.keyEncryption.decrypt(row.value)
+    });
+  }
 }
 
 export async function createSqliteApiKeyRepository(
   database: DatabaseSync,
-  config: KeyPoolConfig
+  config: KeyPoolConfig,
+  keyEncryption?: KeyEncryption
 ): Promise<SqliteApiKeyRepository> {
-  const repository = new SqliteApiKeyRepository(database);
+  const repository = new SqliteApiKeyRepository(database, keyEncryption);
   await repository.seedFromConfig(config);
   return repository;
-}
-
-function apiKeyRecordParams(key: ApiKeyRecord): Array<string | number | null> {
-  return [
-    key.id,
-    key.provider,
-    key.pool,
-    key.value,
-    key.weight,
-    key.status,
-    key.rpmLimit ?? null,
-    key.dailyRequestLimit ?? null,
-    dateToSql(key.lastUsedAt),
-    dateToSql(key.coolingDownUntil),
-    key.failureCount,
-    jsonToSql(key.metadata)
-  ];
 }
 
 function rowToApiKeyRecord(row: ApiKeyRow): ApiKeyRecord {
