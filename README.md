@@ -38,7 +38,7 @@ KeyPool does exactly one thing — **pick the right key, for the right task, at 
 | 🪜 | Provider fallback chain | ⏳ v0.3 |
 | 📊 | Prometheus metrics | ⏳ v0.3 |
 | 🧩 | Multi-provider adapters (Anthropic, Gemini, custom) | ⏳ v0.2 |
-| 🗂️ | SQLite / Postgres / Redis storage | ⏳ v0.6 |
+| 🗂️ | SQLite / Postgres / Redis storage | ✅ SQLite basic / ⏳ Postgres Redis |
 | 🔌 | Python / TS SDKs | ⏳ v0.7 |
 | 🌐 | Production admin web UI | ✅ basic done |
 
@@ -100,7 +100,7 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned and what is already done.
 
 ## Quick start
 
-Requires Node ≥ 20.
+Requires Node ≥ 22.5.
 
 ```bash
 git clone https://github.com/jlx1999s/AllKeyPool.git
@@ -124,7 +124,15 @@ Admin console:
 
 Set `KEYPOOL_ADMIN_TOKEN` in production. When it is not set, local development uses the fallback token `keypool-admin-dev`.
 
-The admin console can inspect runtime config, add in-memory OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage and health events, and run health/chat tests. Runtime additions, usage records, and health events are not persisted to YAML or a database yet.
+The admin console can inspect runtime config, add OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage and health events, and run health/chat tests.
+
+By default KeyPool uses in-memory storage for local development. Enable SQLite persistence for runtime keys, usage records, and health events:
+
+```bash
+KEYPOOL_STORAGE=sqlite KEYPOOL_SQLITE_PATH=./data/keypool.db npm run dev
+```
+
+YAML remains the bootstrap config. Admin-added runtime keys are stored in SQLite with the provider/base URL/model metadata needed to restore routing after restart.
 
 Provider presets are available when adding keys, so common vendors can be selected without manually filling every field. Current presets:
 
@@ -166,6 +174,7 @@ Key health policy:
 - First consecutive provider failure marks a key as `degraded`.
 - Third consecutive provider failure marks a key as `cooling_down`.
 - `cooling_down` and `disabled` keys are skipped by scheduling.
+- Expired cooldowns are released before scheduling and return to `degraded`.
 - A successful provider request resets failure count and recovers a `degraded` key to `healthy`.
 
 OpenAI-compatible chat endpoint:

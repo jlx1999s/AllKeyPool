@@ -148,6 +148,10 @@ export class InMemoryApiKeyRepository implements ApiKeyRepository {
 }
 
 export function createInMemoryApiKeyRepository(config: KeyPoolConfig): InMemoryApiKeyRepository {
+  return new InMemoryApiKeyRepository(createApiKeyRecordsFromConfig(config));
+}
+
+export function createApiKeyRecordsFromConfig(config: KeyPoolConfig): ApiKeyRecord[] {
   const keys: ApiKeyRecord[] = [];
 
   for (const [poolName, pool] of Object.entries(config.pools)) {
@@ -187,5 +191,5 @@ export function createInMemoryApiKeyRepository(config: KeyPoolConfig): InMemoryA
     }
   }
 
-  return new InMemoryApiKeyRepository(keys);
+  return keys;
 }

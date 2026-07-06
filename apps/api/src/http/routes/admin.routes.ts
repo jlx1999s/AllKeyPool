@@ -1,8 +1,12 @@
 import type { ApiKeyRecord } from "@keypool/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { OpenAIAdapter } from "../../providers/openai/openai.adapter.js";
 import { findProviderPreset, providerPresets } from "../../providers/provider-presets.js";
+import {
+  restoreRuntimeConfigFromKeys,
+  upsertRuntimePoolConfig,
+  upsertRuntimeProviderConfig
+} from "../../runtime/runtime-key-config.js";
 import { renderAdminPanelHtml } from "../views/admin-panel.view.js";
 
 const upsertKeyRequestSchema = z.object({
@@ -121,6 +125,9 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         usingDevToken: app.adminAuth.usingDevToken
       },
       fakeProvider: app.fakeProvider,
+      storage: {
+        kind: app.storageKind
+      },
       providers: app.providerRegistry.list().map((provider) => provider.name),
       presets: providerPresets,
       pools: Object.entries(app.config.pools).map(([name, pool]) => ({
@@ -177,16 +184,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
     const body = resolvedBody.value;
 
-    if (!app.providerRegistry.has(body.provider)) {
-      app.providerRegistry.register(new OpenAIAdapter({
-        name: body.provider,
-        baseUrl: body.baseUrl
-      }));
-    }
-
     upsertRuntimeProviderConfig(app, body);
     upsertRuntimePoolConfig(app, body);
     await app.apiKeyRepository.upsert(toApiKeyRecord(body));
+    await restoreRuntimeConfigFromKeys(app);
 
     return reply.status(201).send({
       ok: true
@@ -344,6 +345,13 @@ function toApiKeyRecord(input: ResolvedUpsertKeyRequest): ApiKeyRecord {
 
   if (input.rpmLimit !== undefined) record.rpmLimit = input.rpmLimit;
   if (input.dailyRequestLimit !== undefined) record.dailyRequestLimit = input.dailyRequestLimit;
+  record.metadata = {
+    runtimeConfig: {
+      providerType: input.providerType,
+      baseUrl: input.baseUrl,
+      model: input.model
+    }
+  };
 
   return record;
 }
@@ -354,51 +362,6 @@ function redactKey(key: ApiKeyRecord): Omit<ApiKeyRecord, "value"> & { valuePrev
     ...safeKey,
     valuePreview: previewSecret(key.value)
   };
-}
-
-function upsertRuntimeProviderConfig(app: FastifyInstance, input: ResolvedUpsertKeyRequest): void {
-  const provider = app.config.providers[input.provider];
-
-  if (provider) {
-    return;
-  }
-
-  app.config.providers[input.provider] = {
-    type: input.providerType,
-    baseUrl: input.baseUrl,
-    keys: []
-  };
-}
-
-function upsertRuntimePoolConfig(app: FastifyInstance, input: ResolvedUpsertKeyRequest): void {
-  const pool = app.config.pools[input.pool];
-
-  if (!pool) {
-    app.config.pools[input.pool] = {
-      strategy: "round_robin",
-      providers: [
-        {
-          provider: input.provider,
-          models: [input.model]
-        }
-      ]
-    };
-    return;
-  }
-
-  const poolProvider = pool.providers.find((provider) => provider.provider === input.provider);
-
-  if (!poolProvider) {
-    pool.providers.push({
-      provider: input.provider,
-      models: [input.model]
-    });
-    return;
-  }
-
-  if (!poolProvider.models.includes(input.model)) {
-    poolProvider.models.push(input.model);
-  }
 }
 
 function previewSecret(value: string): string {

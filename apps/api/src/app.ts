@@ -6,8 +6,8 @@ import { InMemoryQuotaManager, type QuotaManager } from "./core/quota/quota-mana
 import { RetryPolicy } from "./core/retry/retry-policy.js";
 import { SchedulerService } from "./core/scheduler/scheduler.js";
 import { createDefaultSchedulingStrategies } from "./core/scheduler/strategy-registry.js";
-import { InMemoryHealthEventRecorder, type HealthEventRecorder } from "./observability/health-event-recorder.js";
-import { InMemoryUsageRecorder, type UsageRecorder } from "./observability/usage-recorder.js";
+import type { HealthEventRecorder } from "./observability/health-event-recorder.js";
+import type { UsageRecorder } from "./observability/usage-recorder.js";
 import { registerErrorHandler } from "./http/middleware/error-handler.js";
 import { registerRequestId } from "./http/middleware/request-id.js";
 import { registerHealthRoutes } from "./http/routes/health.routes.js";
@@ -16,10 +16,11 @@ import { registerDemoRoutes } from "./http/routes/demo.routes.js";
 import { registerProxyRoutes } from "./http/routes/proxy.routes.js";
 import { ProviderRegistry } from "./providers/provider-registry.js";
 import { registerConfiguredProviders } from "./providers/register-configured-providers.js";
+import { restoreRuntimeConfigFromKeys } from "./runtime/runtime-key-config.js";
 import { createAdminAuth, type AdminAuth } from "./security/admin-auth.js";
 import { redactSecrets } from "./security/secret-redaction.js";
+import { createStorage } from "./storage/create-storage.js";
 import type { ApiKeyRepository } from "./storage/repositories/api-key.repository.js";
-import { createInMemoryApiKeyRepository } from "./storage/repositories/in-memory-api-key.repository.js";
 
 export interface BuildAppOptions {
   config: KeyPoolConfig;
@@ -49,10 +50,11 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     }
   });
 
-  const apiKeyRepository = createInMemoryApiKeyRepository(options.config);
+  const storage = await createStorage(options.config);
+  const apiKeyRepository = storage.apiKeyRepository;
   const quotaManager = new InMemoryQuotaManager();
-  const healthEventRecorder = new InMemoryHealthEventRecorder();
-  const usageRecorder = new InMemoryUsageRecorder();
+  const healthEventRecorder = storage.healthEventRecorder;
+  const usageRecorder = storage.usageRecorder;
   const keyHealthService = new KeyHealthService({
     apiKeyRepository,
     coolingDownFailureThreshold: 3
@@ -195,6 +197,13 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.decorate("providerRegistry", providerRegistry);
   app.decorate("adminAuth", adminAuth);
   app.decorate("fakeProvider", fakeProvider);
+  app.decorate("storageKind", storage.kind);
+
+  await restoreRuntimeConfigFromKeys(app);
+
+  app.addHook("onClose", async () => {
+    storage.close();
+  });
 
   registerRequestId(app);
   registerErrorHandler(app);
@@ -220,5 +229,6 @@ declare module "fastify" {
     providerRegistry: ProviderRegistry;
     adminAuth: AdminAuth;
     fakeProvider: boolean;
+    storageKind: "memory" | "sqlite";
   }
 }

@@ -130,7 +130,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ⏳ Key encryption at rest (AES-GCM)
 
 ## v0.6 — Storage & multi-instance
-- ⏳ SQLite storage backend
+- ✅ SQLite storage backend for runtime keys, usage records, and health events
 - ⏳ Postgres storage backend
 - ⏳ Redis adapter for distributed rate-limit
 - ⏳ Hot config reload
