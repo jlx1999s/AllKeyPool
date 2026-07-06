@@ -33,6 +33,8 @@ KeyPool does exactly one thing — **pick the right key, for the right task, at 
 | 🧪 | Fake provider pool + failure DSL | ✅ done |
 | 📈 | Per-key usage timeline | ✅ basic done |
 | 🎬 | Demo Runner endpoint + panel | ✅ done |
+| 🎨 | Sidebar/drawer/toast admin UI | ✅ done |
+| 🌐 | EN + zh-CN i18n | ✅ done |
 | 🪜 | Provider fallback chain | ⏳ v0.3 |
 | 📊 | Prometheus metrics | ⏳ v0.3 |
 | 🧩 | Multi-provider adapters (Anthropic, Gemini, custom) | ⏳ v0.2 |

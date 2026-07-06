@@ -68,6 +68,26 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ Admin panel "Demo Runner" section with model picker, turns editor, results table, metric cards
 - ✅ Executor fix: caller-supplied `excludedKeyIds` no longer overwritten by `attemptedKeyIds`
 
+## v0.2.7 — Admin console rewrite
+- ✅ Sidebar IA: 6 pages (Overview / Demo Runner / Keys / Pools / Usage / Settings)
+- ✅ Topbar with brand mark, env pill, language switch, action buttons
+- ✅ Right-side drawer (Add Key form, Timeline details)
+- ✅ Toast notifications (4 kinds)
+- ✅ Hash routing for navigation
+- ✅ Sticky-header tables with toolbar (search + filter)
+- ✅ Pool cards grid
+- ✅ Empty states with primary CTAs
+- ✅ Stat grids with auto-fit layout
+- ✅ Settings page (auth, runtime, OpenAPI reference)
+
+## v0.2.8 — i18n
+- ✅ EN + zh-CN dictionaries, ~150 translation keys
+- ✅ `data-i18n` / `data-i18n-placeholder` / `data-i18n-title` attributes
+- ✅ `t(key, vars)` helper with `{var}` substitution
+- ✅ Language switch in topbar + auth card
+- ✅ localStorage persistence; browser-language auto-detect
+- ✅ CJK font fallbacks (PingFang SC, Microsoft YaHei)
+
 ## v0.3 — Resilience
 - ⏳ Circuit breaker (Closed / Open / Half-Open)
 - ⏳ Fallback chain (provider-level)
