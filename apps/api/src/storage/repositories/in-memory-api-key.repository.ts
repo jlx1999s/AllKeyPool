@@ -100,6 +100,11 @@ export function createInMemoryApiKeyRepository(config: KeyPoolConfig): InMemoryA
           key.dailyRequestLimit = providerKey.dailyRequests;
         }
 
+        const scriptSpec = providerKey.script ?? provider.script;
+        if (scriptSpec) {
+          key.metadata = { ...(key.metadata ?? {}), scriptSpec };
+        }
+
         keys.push(key);
       }
     }

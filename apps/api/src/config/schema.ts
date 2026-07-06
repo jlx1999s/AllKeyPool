@@ -5,12 +5,16 @@ const providerKeySchema = z.object({
   value: z.string().min(1),
   weight: z.number().int().positive().default(1),
   rpm: z.number().int().positive().optional(),
-  dailyRequests: z.number().int().positive().optional()
+  dailyRequests: z.number().int().positive().optional(),
+  /** per-key fake script spec, e.g. "periodic(period=3, rate_limited)". Only used when KEYPOOL_FAKE_PROVIDER=1. */
+  script: z.string().optional()
 });
 
 const providerSchema = z.object({
   type: z.string().min(1),
   baseUrl: z.string().url(),
+  /** default fake script applied to keys that don't specify their own. Only used when KEYPOOL_FAKE_PROVIDER=1. */
+  script: z.string().optional(),
   keys: z.array(providerKeySchema).min(1)
 });
 

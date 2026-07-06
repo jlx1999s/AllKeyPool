@@ -1,0 +1,153 @@
+# Fake provider pool — for local testing of KeyPool's scheduling, retry, and rate-limiting.
+#
+# Usage:
+#   KEYPOOL_CONFIG=./config/keypool.fake.yaml KEYPOOL_FAKE_PROVIDER=1 npm run dev
+#
+# What you should observe by sending 20-30 /v1/chat/completions requests:
+#   1. round_robin pool rotates across the 3 ok-* keys evenly
+#   2. weighted_round_robin pool favors higher-weight keys
+#   3. rate-limited pool: every 3rd request on rl-prod-1 returns 429,
+#      the executor retries with another key from the same pool
+#   4. burst pool: first 2 requests/window ok, 3rd returns 429 (mirrors QuotaManager)
+#   5. chaos pool: 10% of requests return 500, useful for stress-testing retry
+#
+# Each response body has a `servedBy` field showing which key handled the request.
+server:
+  host: 0.0.0.0
+  port: 3000
+
+providers:
+  # Plain ok keys — good for verifying even distribution under round_robin.
+  ok-pool:
+    type: openai
+    baseUrl: https://example.invalid/v1
+    keys:
+      - id: ok-key-a
+        value: fake-ok-a
+        weight: 1
+      - id: ok-key-b
+        value: fake-ok-b
+        weight: 1
+      - id: ok-key-c
+        value: fake-ok-c
+        weight: 1
+
+  # Weighted keys — verify the weighted_round_robin strategy.
+  weighted-pool:
+    type: openai
+    baseUrl: https://example.invalid/v1
+    keys:
+      - id: w-key-light
+        value: fake-w-light
+        weight: 1
+      - id: w-key-medium
+        value: fake-w-medium
+        weight: 5
+      - id: w-key-heavy
+        value: fake-w-heavy
+        weight: 10
+
+  # Periodic 429 injection on key 1 — verify executor retries to key 2/3.
+  rate-limited-pool:
+    type: openai
+    baseUrl: https://example.invalid/v1
+    keys:
+      - id: rl-prod-1
+        value: fake-rl-1
+        weight: 1
+        script: "periodic(period=3, rate_limited)"
+      - id: rl-prod-2
+        value: fake-rl-2
+        weight: 1
+      - id: rl-prod-3
+        value: fake-rl-3
+        weight: 1
+
+  # Burst rate limit — first 2 per second ok, then 429. Verifies quota-window behavior.
+  burst-pool:
+    type: openai
+    baseUrl: https://example.invalid/v1
+    script: "burst(windowMs=1000, allowed=2, outcome=rate_limited)"
+    keys:
+      - id: burst-1
+        value: fake-burst-1
+        weight: 1
+      - id: burst-2
+        value: fake-burst-2
+        weight: 1
+
+  # 10% probability of 500 — stress test retry policy.
+  chaos-pool:
+    type: openai
+    baseUrl: https://example.invalid/v1
+    script: "probability(p=0.1, outcome=server_error, seed=42)"
+    keys:
+      - id: chaos-1
+        value: fake-chaos-1
+        weight: 1
+      - id: chaos-2
+        value: fake-chaos-2
+        weight: 1
+
+  # A pool with a real RPM cap — verifies QuotaManager skips over-quota keys.
+  rpm-pool:
+    type: openai
+    baseUrl: https://example.invalid/v1
+    keys:
+      - id: rpm-tight
+        value: fake-rpm-1
+        weight: 1
+        rpm: 2
+      - id: rpm-loose
+        value: fake-rpm-2
+        weight: 1
+        rpm: 100
+
+pools:
+  ok_pool:
+    strategy: round_robin
+    providers:
+      - provider: ok-pool
+        models:
+          - fake-ok
+  weighted_pool:
+    strategy: weighted_round_robin
+    providers:
+      - provider: weighted-pool
+        models:
+          - fake-weighted
+  rate_limited_pool:
+    strategy: round_robin
+    providers:
+      - provider: rate-limited-pool
+        models:
+          - fake-rl
+  burst_pool:
+    strategy: round_robin
+    providers:
+      - provider: burst-pool
+        models:
+          - fake-burst
+  chaos_pool:
+    strategy: round_robin
+    providers:
+      - provider: chaos-pool
+        models:
+          - fake-chaos
+  rpm_pool:
+    strategy: round_robin
+    providers:
+      - provider: rpm-pool
+        models:
+          - fake-rpm
+
+tasks: {}
+
+retry:
+  maxAttempts: 4
+  retryOn:
+    - 429
+    - 500
+    - 502
+    - 503
+    - 504

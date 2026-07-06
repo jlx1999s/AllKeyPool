@@ -48,6 +48,26 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ⏳ Per-key TPM rate limiting
 - ✅ In-memory key state store
 
+## v0.2.5 — Fake pool & observability
+- ✅ `FakeOpenAIAdapter` (no network, OpenAI-shaped responses with `servedBy` / `keyId` markers)
+- ✅ Failure DSL: `sequence` / `periodic` / `burst` / `probability`
+- ✅ YAML string spec parser for failure scripts
+- ✅ Static `config/keypool.fake.yaml` covering 6 strategies (RR, WRR, periodic 429, burst, chaos, RPM)
+- ✅ `KEYPOOL_FAKE_PROVIDER=1` env switch
+- ✅ `UsageRecorder` interface + `InMemoryUsageRecorder` (capacity 64 / key)
+- ✅ `ProviderRequestExecutor.onAttemptSuccess` hook with latency
+- ✅ Admin `GET /admin/api/state` exposes per-key usage summary
+- ✅ Admin `GET /admin/api/keys/:id/usage?limit=N` returns per-key timeline
+
+## v0.2.6 — Demo Runner
+- ✅ `POST /_demo/chat` endpoint with admin auth
+- ✅ Three modes: single / multi-turn / load
+- ✅ Per-call attempt chain via `ProviderRequestExecutor.attemptSink`
+- ✅ Sticky session simulation via caller-supplied `excludedKeyIds`
+- ✅ Summary metrics: success / failed / avg / p50 / p95 / distinct keys
+- ✅ Admin panel "Demo Runner" section with model picker, turns editor, results table, metric cards
+- ✅ Executor fix: caller-supplied `excludedKeyIds` no longer overwritten by `attemptedKeyIds`
+
 ## v0.3 — Resilience
 - ⏳ Circuit breaker (Closed / Open / Half-Open)
 - ⏳ Fallback chain (provider-level)
