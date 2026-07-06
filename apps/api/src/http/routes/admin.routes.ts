@@ -1,6 +1,7 @@
 import type { ApiKeyRecord } from "@keypool/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
+import type { AuditActor } from "../../observability/audit-log-recorder.js";
 import { findProviderPreset, providerPresets } from "../../providers/provider-presets.js";
 import {
   restoreRuntimeConfigFromKeys,
@@ -52,6 +53,10 @@ const usageQuerySchema = z.object({
 });
 
 const healthEventsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(200).default(50)
+});
+
+const auditLogsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(50)
 });
 
@@ -111,10 +116,18 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.get("/admin/api/audit-logs", async (request) => {
+    const query = auditLogsQuerySchema.parse(request.query);
+    return {
+      auditLogs: await app.auditLogRecorder.listRecent(query.limit)
+    };
+  });
+
   app.get("/admin/api/state", async () => {
     const keys = await app.apiKeyRepository.list();
     const recentUsage = await app.usageRecorder.listRecent(500);
     const recentHealthEvents = await app.healthEventRecorder.listRecent(20);
+    const recentAuditLogs = await app.auditLogRecorder.listRecent(20);
     const usageSnapshot = buildUsageSnapshot(recentUsage);
 
     return {
@@ -141,7 +154,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         usage: usageSnapshot[key.id] ?? { total: 0, success: 0, error: 0 }
       })),
       usage: recentUsage.slice(0, 20),
-      healthEvents: recentHealthEvents
+      healthEvents: recentHealthEvents,
+      auditLogs: recentAuditLogs
     };
   });
 
@@ -183,11 +197,22 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const body = resolvedBody.value;
+    const existingKey = await app.apiKeyRepository.findById(body.id);
+    const auditAction = existingKey === undefined ? "key_created" : "key_updated";
 
     upsertRuntimeProviderConfig(app, body);
     upsertRuntimePoolConfig(app, body);
     await app.apiKeyRepository.upsert(toApiKeyRecord(body));
     await restoreRuntimeConfigFromKeys(app);
+    await app.auditLogRecorder.record({
+      action: auditAction,
+      actor: getAdminActor(),
+      targetType: "api_key",
+      targetId: body.id,
+      outcome: "success",
+      message: auditAction === "key_created" ? "API key created" : "API key updated",
+      metadata: keyConfigAuditMetadata(body)
+    });
 
     return reply.status(201).send({
       ok: true
@@ -197,9 +222,21 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/admin/api/keys/:id/status", async (request, reply) => {
     const keyId = getKeyId(request);
     const body = keyStatusSchema.parse(request.body);
+    const existingKey = await app.apiKeyRepository.findById(keyId);
     const updated = await app.apiKeyRepository.updateStatus(keyId, body.status);
 
     if (!updated) {
+      await app.auditLogRecorder.record({
+        action: "key_status_changed",
+        actor: getAdminActor(),
+        targetType: "api_key",
+        targetId: keyId,
+        outcome: "error",
+        message: "API key status change failed: key not found",
+        metadata: {
+          requestedStatus: body.status
+        }
+      });
       return reply.status(404).send({
         error: {
           code: "key_not_found",
@@ -215,6 +252,18 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       code: body.status,
       message: `Key status changed to ${body.status}`
     });
+    await app.auditLogRecorder.record({
+      action: "key_status_changed",
+      actor: getAdminActor(),
+      targetType: "api_key",
+      targetId: keyId,
+      outcome: "success",
+      message: `API key status changed to ${body.status}`,
+      metadata: {
+        previousStatus: existingKey?.status,
+        status: body.status
+      }
+    });
 
     return {
       ok: true
@@ -223,9 +272,18 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete("/admin/api/keys/:id", async (request, reply) => {
     const keyId = getKeyId(request);
+    const existingKey = await app.apiKeyRepository.findById(keyId);
     const deleted = await app.apiKeyRepository.delete(keyId);
 
     if (!deleted) {
+      await app.auditLogRecorder.record({
+        action: "key_deleted",
+        actor: getAdminActor(),
+        targetType: "api_key",
+        targetId: keyId,
+        outcome: "error",
+        message: "API key delete failed: key not found"
+      });
       return reply.status(404).send({
         error: {
           code: "key_not_found",
@@ -233,6 +291,22 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         }
       });
     }
+
+    const auditEntry = {
+      action: "key_deleted",
+      actor: getAdminActor(),
+      targetType: "api_key",
+      targetId: keyId,
+      outcome: "success",
+      message: "API key deleted"
+    } as const;
+
+    await app.auditLogRecorder.record(existingKey === undefined
+      ? auditEntry
+      : {
+        ...auditEntry,
+        metadata: existingKeyAuditMetadata(existingKey)
+      });
 
     return {
       ok: true
@@ -330,6 +404,43 @@ function getKeyId(request: FastifyRequest): string {
   }).parse(request.params);
 
   return decodeURIComponent(params.id);
+}
+
+function getAdminActor(): AuditActor {
+  return {
+    type: "admin",
+    id: "admin"
+  };
+}
+
+function keyConfigAuditMetadata(input: ResolvedUpsertKeyRequest): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    provider: input.provider,
+    providerType: input.providerType,
+    baseUrl: input.baseUrl,
+    pool: input.pool,
+    model: input.model,
+    weight: input.weight
+  };
+
+  if (input.rpmLimit !== undefined) metadata.rpmLimit = input.rpmLimit;
+  if (input.dailyRequestLimit !== undefined) metadata.dailyRequestLimit = input.dailyRequestLimit;
+
+  return metadata;
+}
+
+function existingKeyAuditMetadata(key: ApiKeyRecord): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    provider: key.provider,
+    pool: key.pool,
+    status: key.status,
+    weight: key.weight
+  };
+
+  if (key.rpmLimit !== undefined) metadata.rpmLimit = key.rpmLimit;
+  if (key.dailyRequestLimit !== undefined) metadata.dailyRequestLimit = key.dailyRequestLimit;
+
+  return metadata;
 }
 
 function toApiKeyRecord(input: ResolvedUpsertKeyRequest): ApiKeyRecord {

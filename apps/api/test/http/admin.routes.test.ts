@@ -199,12 +199,67 @@ describe("admin routes", () => {
     });
     expect(deleteResponse.statusCode).toBe(200);
 
+    const auditResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/audit-logs?limit=10",
+      headers: adminHeaders
+    });
+    expect(auditResponse.statusCode).toBe(200);
+    expect(auditResponse.json().auditLogs).toEqual([
+      expect.objectContaining({
+        action: "key_deleted",
+        targetType: "api_key",
+        targetId: "openai-prod-1",
+        outcome: "success",
+        metadata: expect.objectContaining({
+          provider: "openai",
+          pool: "text_generation",
+          status: "healthy"
+        })
+      }),
+      expect.objectContaining({
+        action: "key_status_changed",
+        targetId: "openai-prod-1",
+        outcome: "success",
+        metadata: expect.objectContaining({
+          previousStatus: "disabled",
+          status: "healthy"
+        })
+      }),
+      expect.objectContaining({
+        action: "key_status_changed",
+        targetId: "openai-prod-1",
+        outcome: "success",
+        metadata: expect.objectContaining({
+          previousStatus: "healthy",
+          status: "disabled"
+        })
+      }),
+      expect.objectContaining({
+        action: "key_created",
+        targetId: "openai-prod-1",
+        outcome: "success",
+        metadata: expect.objectContaining({
+          provider: "openai",
+          pool: "text_generation",
+          model: "gpt-4.1-mini"
+        })
+      })
+    ]);
+    expect(JSON.stringify(auditResponse.json())).not.toContain("sk-test-secret");
+
     state = (await app.inject({
       method: "GET",
       url: "/admin/api/state",
       headers: adminHeaders
     })).json();
     expect(state.keys).toEqual([]);
+    expect(state.auditLogs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "key_deleted",
+        targetId: "openai-prod-1"
+      })
+    ]));
 
     await app.close();
   });

@@ -110,6 +110,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ Admin recent usage API and table
 - ✅ In-memory health event recorder
 - ✅ Admin recent health event API and table
+- ✅ Admin operation audit log API and Settings table
 - ✅ Automatic degraded / cooling_down key states
 - ✅ Cooldown expiry and auto-recovery
 - ⏳ Persist config changes safely
@@ -124,13 +125,14 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 ## v0.5 — Observability & ops
 - ⏳ OpenTelemetry tracing
 - ⏳ Grafana JSON dashboard
+- ✅ Admin operation audit log
 - ⏳ Structured audit log per request
 - ✅ Admin API for runtime key management
-- ⏳ Admin usage API
-- ⏳ Key encryption at rest (AES-GCM)
+- ✅ Admin usage API
+- ✅ Key encryption at rest (AES-GCM)
 
 ## v0.6 — Storage & multi-instance
-- ✅ SQLite storage backend for runtime keys, usage records, and health events
+- ✅ SQLite storage backend for runtime keys, usage records, health events, and audit logs
 - ⏳ Postgres storage backend
 - ⏳ Redis adapter for distributed rate-limit
 - ⏳ Hot config reload

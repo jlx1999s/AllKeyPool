@@ -6,6 +6,7 @@ import { InMemoryQuotaManager, type QuotaManager } from "./core/quota/quota-mana
 import { RetryPolicy } from "./core/retry/retry-policy.js";
 import { SchedulerService } from "./core/scheduler/scheduler.js";
 import { createDefaultSchedulingStrategies } from "./core/scheduler/strategy-registry.js";
+import type { AuditLogRecorder } from "./observability/audit-log-recorder.js";
 import type { HealthEventRecorder } from "./observability/health-event-recorder.js";
 import type { UsageRecorder } from "./observability/usage-recorder.js";
 import { registerErrorHandler } from "./http/middleware/error-handler.js";
@@ -55,6 +56,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const quotaManager = new InMemoryQuotaManager();
   const healthEventRecorder = storage.healthEventRecorder;
   const usageRecorder = storage.usageRecorder;
+  const auditLogRecorder = storage.auditLogRecorder;
   const keyHealthService = new KeyHealthService({
     apiKeyRepository,
     coolingDownFailureThreshold: 3
@@ -190,6 +192,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.decorate("quotaManager", quotaManager);
   app.decorate("healthEventRecorder", healthEventRecorder);
   app.decorate("usageRecorder", usageRecorder);
+  app.decorate("auditLogRecorder", auditLogRecorder);
   app.decorate("keyHealthService", keyHealthService);
   app.decorate("scheduler", scheduler);
   app.decorate("retryPolicy", retryPolicy);
@@ -222,6 +225,7 @@ declare module "fastify" {
     quotaManager: QuotaManager;
     healthEventRecorder: HealthEventRecorder;
     usageRecorder: UsageRecorder;
+    auditLogRecorder: AuditLogRecorder;
     keyHealthService: KeyHealthService;
     scheduler: SchedulerService;
     retryPolicy: RetryPolicy;

@@ -168,6 +168,14 @@ const I18N_EN: I18nDictionary = {
   "settings.runtime.port": "Server port",
   "settings.runtime.retry": "Max retry attempts",
   "settings.runtime.fake": "Provider mode",
+  "settings.audit.title": "Audit log",
+  "settings.audit.desc": "Recent admin operations.",
+  "settings.audit.empty": "No audit events yet",
+  "settings.audit.col.time": "Time",
+  "settings.audit.col.action": "Action",
+  "settings.audit.col.target": "Target",
+  "settings.audit.col.outcome": "Outcome",
+  "settings.audit.col.actor": "Actor",
   "settings.openapi.title": "OpenAPI reference",
   "settings.openapi.desc": "All admin endpoints are served under /admin/api/* and the demo runner under /_demo/*.",
   "settings.openapi.health": "Health",
@@ -175,6 +183,7 @@ const I18N_EN: I18nDictionary = {
   "settings.openapi.state": "State",
   "settings.openapi.keys": "Keys CRUD",
   "settings.openapi.keyUsage": "Key usage",
+  "settings.openapi.audit": "Audit log",
   "settings.openapi.chat": "Chat proxy",
   "settings.openapi.demo": "Demo runner",
 
@@ -373,6 +382,14 @@ const I18N_ZH: I18nDictionary = {
   "settings.runtime.port": "服务端 Port",
   "settings.runtime.retry": "最大重试次数",
   "settings.runtime.fake": "提供方模式",
+  "settings.audit.title": "审计日志",
+  "settings.audit.desc": "最近的后台管理操作。",
+  "settings.audit.empty": "暂无审计事件",
+  "settings.audit.col.time": "时间",
+  "settings.audit.col.action": "操作",
+  "settings.audit.col.target": "目标",
+  "settings.audit.col.outcome": "结果",
+  "settings.audit.col.actor": "操作者",
   "settings.openapi.title": "OpenAPI 参考",
   "settings.openapi.desc": "所有管理端点位于 /admin/api/*,模拟运行端点位于 /_demo/*。",
   "settings.openapi.health": "健康检查",
@@ -380,6 +397,7 @@ const I18N_ZH: I18nDictionary = {
   "settings.openapi.state": "状态",
   "settings.openapi.keys": "密钥 CRUD",
   "settings.openapi.keyUsage": "密钥用量",
+  "settings.openapi.audit": "审计日志",
   "settings.openapi.chat": "聊天代理",
   "settings.openapi.demo": "模拟运行",
 
@@ -1303,9 +1321,33 @@ export function renderAdminPanelHtml(options: AdminPanelViewOptions): string {
                 <div class="field"><label data-i18n="settings.openapi.state">State</label><input class="mono" value="GET /admin/api/state" disabled></div>
                 <div class="field"><label data-i18n="settings.openapi.keys">Keys CRUD</label><input class="mono" value="POST/PATCH/DELETE /admin/api/keys" disabled></div>
                 <div class="field"><label data-i18n="settings.openapi.keyUsage">Key usage</label><input class="mono" value="GET /admin/api/keys/:id/usage" disabled></div>
+                <div class="field"><label data-i18n="settings.openapi.audit">Audit log</label><input class="mono" value="GET /admin/api/audit-logs" disabled></div>
                 <div class="field"><label data-i18n="settings.openapi.chat">Chat proxy</label><input class="mono" value="POST /v1/chat/completions" disabled></div>
                 <div class="field full"><label data-i18n="settings.openapi.demo">Demo runner</label><input class="mono" value="POST /_demo/chat" disabled></div>
               </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 data-i18n="settings.audit.title">Audit log</h2>
+                <p class="muted" style="margin: 4px 0 0; font-size: 13px;" data-i18n="settings.audit.desc">Recent admin operations.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th data-i18n="settings.audit.col.time">Time</th>
+                    <th data-i18n="settings.audit.col.action">Action</th>
+                    <th data-i18n="settings.audit.col.target">Target</th>
+                    <th data-i18n="settings.audit.col.outcome">Outcome</th>
+                    <th data-i18n="settings.audit.col.actor">Actor</th>
+                  </tr>
+                </thead>
+                <tbody id="settings-audit-body"></tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -1485,7 +1527,7 @@ export function renderAdminPanelHtml(options: AdminPanelViewOptions): string {
       close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>'
     };
     const $ = (id) => document.getElementById(id);
-    const state = { keys: [], pools: [], providers: [], presets: [], fakeProvider: false, server: null, retry: null };
+    const state = { keys: [], pools: [], providers: [], presets: [], auditLogs: [], fakeProvider: false, server: null, retry: null };
     function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
     function clearToken() { localStorage.removeItem(TOKEN_KEY); }
@@ -1566,6 +1608,7 @@ export function renderAdminPanelHtml(options: AdminPanelViewOptions): string {
       state.pools = s.pools;
       state.providers = s.providers;
       state.presets = s.presets || [];
+      state.auditLogs = s.auditLogs || [];
       state.fakeProvider = s.fakeProvider;
       state.server = s.server;
       state.retry = s.retry;
@@ -1622,6 +1665,7 @@ export function renderAdminPanelHtml(options: AdminPanelViewOptions): string {
       renderOverview();
       renderKeys();
       renderPools();
+      renderAuditLogs();
       return s;
     }
 
@@ -1772,6 +1816,27 @@ export function renderAdminPanelHtml(options: AdminPanelViewOptions): string {
       }).join("");
     }
     function countKeysInPool(name) { return state.keys.filter((k) => k.pool === name).length; }
+
+    function renderAuditLogs() {
+      const tbody = $("settings-audit-body");
+      if (!tbody) return;
+      if (state.auditLogs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><h3>' + escapeHtml(t("settings.audit.empty")) + '</h3></div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = state.auditLogs.map((entry) => {
+        const actor = entry.actor ? entry.actor.type + ":" + entry.actor.id : "—";
+        const target = (entry.targetType || "—") + (entry.targetId ? " · " + entry.targetId : "");
+        const outcomeKind = entry.outcome === "success" ? "ok" : "danger";
+        return '<tr>'
+          + '<td class="muted nowrap">' + escapeHtml(new Date(entry.createdAt).toLocaleString()) + '</td>'
+          + '<td><code>' + escapeHtml(entry.action) + '</code></td>'
+          + '<td class="mono">' + escapeHtml(target) + '</td>'
+          + '<td><span class="pill pill-' + outcomeKind + ' pill-dot">' + escapeHtml(entry.outcome) + '</span></td>'
+          + '<td class="muted">' + escapeHtml(actor) + '</td>'
+          + '</tr>';
+      }).join("");
+    }
 
     async function refreshUsage() {
       try {

@@ -32,6 +32,7 @@ KeyPool does exactly one thing — **pick the right key, for the right task, at 
 | 🛠️ | Token-protected admin console | ✅ basic done |
 | 🧪 | Fake provider pool + failure DSL | ✅ done |
 | 📈 | Per-key usage timeline | ✅ basic done |
+| 🧾 | Admin operation audit log | ✅ basic done |
 | 🎬 | Demo Runner endpoint + panel | ✅ done |
 | 🎨 | Sidebar/drawer/toast admin UI | ✅ done |
 | 🌐 | EN + zh-CN i18n | ✅ done |
@@ -124,9 +125,9 @@ Admin console:
 
 Set `KEYPOOL_ADMIN_TOKEN` in production. When it is not set, local development uses the fallback token `keypool-admin-dev`.
 
-The admin console can inspect runtime config, add OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage and health events, and run health/chat tests.
+The admin console can inspect runtime config, add OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage, health events, audit logs, and run health/chat tests.
 
-By default KeyPool uses in-memory storage for local development. Enable SQLite persistence for runtime keys, usage records, and health events:
+By default KeyPool uses in-memory storage for local development. Enable SQLite persistence for runtime keys, usage records, health events, and audit logs:
 
 ```bash
 KEYPOOL_STORAGE=sqlite KEYPOOL_SQLITE_PATH=./data/keypool.db npm run dev
@@ -172,6 +173,13 @@ Recent health events API:
 
 ```bash
 curl 'http://localhost:3000/admin/api/health-events?limit=20' \
+  -H 'authorization: Bearer keypool-admin-dev'
+```
+
+Recent admin audit log API:
+
+```bash
+curl 'http://localhost:3000/admin/api/audit-logs?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 

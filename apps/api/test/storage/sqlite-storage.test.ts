@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openSqliteDatabase } from "../../src/storage/sqlite/sqlite-connection.js";
 import { createSqliteApiKeyRepository } from "../../src/storage/repositories/sqlite-api-key.repository.js";
+import { SqliteAuditLogRecorder } from "../../src/observability/sqlite-audit-log-recorder.js";
 import { SqliteHealthEventRecorder } from "../../src/observability/sqlite-health-event-recorder.js";
 import { SqliteUsageRecorder } from "../../src/observability/sqlite-usage-recorder.js";
 import { AesGcmKeyEncryption } from "../../src/security/key-encryption.js";
@@ -103,10 +104,11 @@ describe("SQLite storage", () => {
     database.close();
   });
 
-  it("persists usage records and health events", async () => {
+  it("persists usage records, health events, and audit logs", async () => {
     const database = openSqliteDatabase({ path: ":memory:" });
     const usageRecorder = new SqliteUsageRecorder(database);
     const healthEventRecorder = new SqliteHealthEventRecorder(database);
+    const auditLogRecorder = new SqliteAuditLogRecorder(database);
 
     await usageRecorder.record({
       requestId: "req-1",
@@ -131,6 +133,21 @@ describe("SQLite storage", () => {
         attempt: 1
       }
     });
+    await auditLogRecorder.record({
+      action: "key_created",
+      actor: {
+        type: "admin",
+        id: "admin"
+      },
+      targetType: "api_key",
+      targetId: "key-1",
+      outcome: "success",
+      message: "API key created",
+      metadata: {
+        provider: "openai",
+        pool: "text_generation"
+      }
+    });
 
     await expect(usageRecorder.listRecent()).resolves.toEqual([
       expect.objectContaining({
@@ -146,6 +163,23 @@ describe("SQLite storage", () => {
         keyId: "key-1",
         metadata: {
           attempt: 1
+        },
+        createdAt: expect.any(Date) as Date
+      })
+    ]);
+    await expect(auditLogRecorder.listRecent()).resolves.toEqual([
+      expect.objectContaining({
+        action: "key_created",
+        actor: {
+          type: "admin",
+          id: "admin"
+        },
+        targetType: "api_key",
+        targetId: "key-1",
+        outcome: "success",
+        metadata: {
+          provider: "openai",
+          pool: "text_generation"
         },
         createdAt: expect.any(Date) as Date
       })
