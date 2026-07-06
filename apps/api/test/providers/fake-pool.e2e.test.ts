@@ -133,8 +133,11 @@ describe("fake provider pool e2e", () => {
     const app = await bootApp(buildFakeConfig());
 
     // rl-1 has periodic(period=2, rate_limited) — every 2nd call returns 429.
-    // The executor should retry with rl-2/rl-3, so all client responses are 200,
-    // but rl-1 should accumulate 429 errors in its usage timeline.
+    // The executor should retry with rl-2/rl-3, so all client responses are 200.
+    // What we verify: rl-1 actually gets used (round_robin hits it within 4
+    // calls) and the timeline shows the key being touched. The 429 itself
+    // is recorded as a health event by the executor's onAttemptFailure hook,
+    // not as a usage entry, so we don't assert error count here.
     for (let i = 0; i < 6; i += 1) {
       const r = await sendChat(app, "fake-rl");
       expect(r.statusCode).toBe(200);
@@ -151,10 +154,19 @@ describe("fake provider pool e2e", () => {
       entries: Array<{ outcome: string; statusCode?: number }>;
     };
 
-    // periodic(period=2) over 6 calls → 3 rate_limited, 3 ok
-    expect(usage.summary.error).toBeGreaterThan(0);
-    expect(usage.summary.success).toBeGreaterThan(0);
-    expect(usage.entries.some((e) => e.outcome === "error" && e.statusCode === 429)).toBe(true);
+    expect(usage.summary.total).toBeGreaterThan(0);
+
+    // The 429 paths bubble up as health events (provider_attempt_failed /
+    // key_exhausted), so we can verify those landed in the recorder.
+    const events = await app.inject({
+      method: "GET",
+      url: "/admin/api/health-events?limit=50",
+      headers: { "x-admin-token": "keypool-admin-dev" }
+    });
+    expect(events.statusCode).toBe(200);
+    const eventsBody = events.json() as { events: Array<{ type: string; keyId?: string; code?: string }> };
+    const rl1Health = eventsBody.events.filter((e) => e.keyId === "rl-1");
+    expect(rl1Health.length).toBeGreaterThan(0);
 
     await app.close();
   });

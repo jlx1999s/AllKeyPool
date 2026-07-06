@@ -124,12 +124,49 @@ Admin console:
 
 Set `KEYPOOL_ADMIN_TOKEN` in production. When it is not set, local development uses the fallback token `keypool-admin-dev`.
 
-The admin console can inspect runtime config, add in-memory OpenAI-compatible keys, enable/disable/delete keys, and run health/chat tests. Runtime additions are not persisted to YAML yet.
+The admin console can inspect runtime config, add in-memory OpenAI-compatible keys, enable/disable/delete keys, inspect recent usage and health events, and run health/chat tests. Runtime additions, usage records, and health events are not persisted to YAML or a database yet.
 
 Provider presets are available when adding keys, so common vendors can be selected without manually filling every field. Current presets:
 
 - OpenAI Compatible: `https://api.openai.com/v1`, `gpt-4.1-mini`
 - MiniMax Official: `https://api.minimax.io/v1`, `MiniMax-M3`
+
+Preset catalog API:
+
+```bash
+curl http://localhost:3000/admin/api/provider-presets \
+  -H 'authorization: Bearer keypool-admin-dev'
+```
+
+Add a key with preset defaults:
+
+```bash
+curl http://localhost:3000/admin/api/keys \
+  -H 'authorization: Bearer keypool-admin-dev' \
+  -H 'content-type: application/json' \
+  -d '{"presetId":"minimax-official","id":"minimax-prod-1","value":"sk-..."}'
+```
+
+Recent usage API:
+
+```bash
+curl 'http://localhost:3000/admin/api/usage?limit=20' \
+  -H 'authorization: Bearer keypool-admin-dev'
+```
+
+Recent health events API:
+
+```bash
+curl 'http://localhost:3000/admin/api/health-events?limit=20' \
+  -H 'authorization: Bearer keypool-admin-dev'
+```
+
+Key health policy:
+
+- First consecutive provider failure marks a key as `degraded`.
+- Third consecutive provider failure marks a key as `cooling_down`.
+- `cooling_down` and `disabled` keys are skipped by scheduling.
+- A successful provider request resets failure count and recovers a `degraded` key to `healthy`.
 
 OpenAI-compatible chat endpoint:
 

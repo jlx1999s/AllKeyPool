@@ -205,6 +205,20 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
         const winningKeyId = lastAttempt?.keyId ?? "unknown";
         distinctKeyIds.add(winningKeyId);
 
+        // Record the final-failure usage so the admin timeline surfaces it.
+        await app.usageRecorder.record({
+          requestId,
+          route: "demo.chat",
+          pool: route.poolName,
+          provider: route.providerName,
+          model: body.model,
+          keyId: winningKeyId,
+          statusCode: providerError ? (providerError.statusCode ?? 0) : 0,
+          outcome: "error",
+          errorCode: providerError ? providerError.code : "internal_error",
+          latencyMs: Date.now() - turnStartedAt
+        });
+
         results.push({
           turn: turnNumber,
           requestId,

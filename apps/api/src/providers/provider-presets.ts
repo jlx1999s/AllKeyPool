@@ -32,3 +32,6 @@ export const providerPresets: ProviderPreset[] = [
   }
 ];
 
+export function findProviderPreset(id: string): ProviderPreset | undefined {
+  return providerPresets.find((preset) => preset.id === id);
+}

@@ -127,4 +127,33 @@ describe("SchedulerService", () => {
       }
     });
   });
+
+  it("releases expired cooling down keys before selecting", async () => {
+    const repository = new InMemoryApiKeyRepository([
+      {
+        id: "cooling-key",
+        provider: "openai",
+        pool: "text_generation",
+        value: "secret",
+        weight: 1,
+        status: "cooling_down",
+        coolingDownUntil: new Date(Date.now() - 1_000),
+        failureCount: 3
+      }
+    ]);
+    const scheduler = new SchedulerService(repository, [new RoundRobinStrategy()]);
+
+    const result = await scheduler.selectKey({
+      requestId: "req-1",
+      pool: "text_generation"
+    });
+
+    expect(result).toMatchObject({
+      key: {
+        id: "cooling-key",
+        status: "degraded"
+      }
+    });
+    expect(result.key).not.toHaveProperty("coolingDownUntil");
+  });
 });

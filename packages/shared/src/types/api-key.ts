@@ -10,6 +10,7 @@ export interface ApiKeyRecord {
   rpmLimit?: number;
   dailyRequestLimit?: number;
   lastUsedAt?: Date;
+  coolingDownUntil?: Date;
   failureCount: number;
   metadata?: Record<string, unknown>;
 }

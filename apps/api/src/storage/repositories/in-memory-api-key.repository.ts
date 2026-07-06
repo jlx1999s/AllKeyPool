@@ -54,6 +54,81 @@ export class InMemoryApiKeyRepository implements ApiKeyRepository {
     });
   }
 
+  async recordFailure(id: string): Promise<ApiKeyRecord | undefined> {
+    const key = this.keys.get(id);
+
+    if (!key) {
+      return undefined;
+    }
+
+    const updatedKey: ApiKeyRecord = {
+      ...key,
+      failureCount: key.failureCount + 1
+    };
+
+    this.keys.set(id, updatedKey);
+
+    return updatedKey;
+  }
+
+  async resetFailures(id: string): Promise<ApiKeyRecord | undefined> {
+    const key = this.keys.get(id);
+
+    if (!key) {
+      return undefined;
+    }
+
+    const { coolingDownUntil: _coolingDownUntil, ...keyWithoutCooldown } = key;
+    const updatedKey: ApiKeyRecord = {
+      ...keyWithoutCooldown,
+      failureCount: 0,
+      status: key.status === "degraded" ? "healthy" : key.status
+    };
+
+    this.keys.set(id, updatedKey);
+
+    return updatedKey;
+  }
+
+  async startCoolingDown(id: string, until: Date): Promise<ApiKeyRecord | undefined> {
+    const key = this.keys.get(id);
+
+    if (!key) {
+      return undefined;
+    }
+
+    const updatedKey: ApiKeyRecord = {
+      ...key,
+      status: "cooling_down",
+      coolingDownUntil: until
+    };
+
+    this.keys.set(id, updatedKey);
+
+    return updatedKey;
+  }
+
+  async releaseExpiredCooldowns(now: Date): Promise<ApiKeyRecord[]> {
+    const releasedKeys: ApiKeyRecord[] = [];
+
+    for (const key of this.keys.values()) {
+      if (key.status !== "cooling_down" || !key.coolingDownUntil || key.coolingDownUntil > now) {
+        continue;
+      }
+
+      const { coolingDownUntil: _coolingDownUntil, ...keyWithoutCooldown } = key;
+      const releasedKey: ApiKeyRecord = {
+        ...keyWithoutCooldown,
+        status: "degraded"
+      };
+
+      this.keys.set(key.id, releasedKey);
+      releasedKeys.push(releasedKey);
+    }
+
+    return releasedKeys;
+  }
+
   async updateStatus(id: string, status: ApiKeyRecord["status"]): Promise<boolean> {
     const key = this.keys.get(id);
 
@@ -61,8 +136,10 @@ export class InMemoryApiKeyRepository implements ApiKeyRepository {
       return false;
     }
 
+    const { coolingDownUntil: _coolingDownUntil, ...keyWithoutCooldown } = key;
+    const baseKey = status === "cooling_down" ? key : keyWithoutCooldown;
     this.keys.set(id, {
-      ...key,
+      ...baseKey,
       status
     });
 

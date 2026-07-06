@@ -2,21 +2,37 @@ import type { ApiKeyRecord } from "@keypool/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { OpenAIAdapter } from "../../providers/openai/openai.adapter.js";
-import { providerPresets } from "../../providers/provider-presets.js";
+import { findProviderPreset, providerPresets } from "../../providers/provider-presets.js";
 import { renderAdminPanelHtml } from "../views/admin-panel.view.js";
 
-const upsertKeySchema = z.object({
-  provider: z.string().min(1),
-  providerType: z.literal("openai").default("openai"),
-  baseUrl: z.string().url(),
-  pool: z.string().min(1),
-  model: z.string().min(1).default("gpt-4.1-mini"),
+const upsertKeyRequestSchema = z.object({
+  presetId: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
+  providerType: z.literal("openai").optional(),
+  baseUrl: z.string().url().optional(),
+  pool: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
   id: z.string().min(1),
   value: z.string().min(1),
   weight: z.coerce.number().int().positive().default(1),
   rpmLimit: z.coerce.number().int().positive().optional(),
   dailyRequestLimit: z.coerce.number().int().positive().optional()
 });
+
+type UpsertKeyRequest = z.infer<typeof upsertKeyRequestSchema>;
+
+interface ResolvedUpsertKeyRequest {
+  provider: string;
+  providerType: "openai";
+  baseUrl: string;
+  pool: string;
+  model: string;
+  id: string;
+  value: string;
+  weight: number;
+  rpmLimit?: number;
+  dailyRequestLimit?: number;
+}
 
 const keyStatusSchema = z.object({
   status: z.enum(["healthy", "degraded", "cooling_down", "disabled"])
@@ -25,6 +41,18 @@ const keyStatusSchema = z.object({
 const chatTestSchema = z.object({
   model: z.string().min(1),
   content: z.string().min(1)
+});
+
+const usageQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(200).default(50)
+});
+
+const healthEventsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(200).default(50)
+});
+
+const keyUsageQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(256).default(64)
 });
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
@@ -61,9 +89,29 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     authenticated: app.adminAuth.verifyRequest(request)
   }));
 
+  app.get("/admin/api/provider-presets", async () => ({
+    presets: providerPresets
+  }));
+
+  app.get("/admin/api/usage", async (request) => {
+    const query = usageQuerySchema.parse(request.query);
+    return {
+      usage: await app.usageRecorder.listRecent(query.limit)
+    };
+  });
+
+  app.get("/admin/api/health-events", async (request) => {
+    const query = healthEventsQuerySchema.parse(request.query);
+    return {
+      events: await app.healthEventRecorder.listRecent(query.limit)
+    };
+  });
+
   app.get("/admin/api/state", async () => {
     const keys = await app.apiKeyRepository.list();
-    const usageSnapshot = app.usageRecorder.snapshot();
+    const recentUsage = await app.usageRecorder.listRecent(500);
+    const recentHealthEvents = await app.healthEventRecorder.listRecent(20);
+    const usageSnapshot = buildUsageSnapshot(recentUsage);
 
     return {
       server: app.config.server,
@@ -84,7 +132,9 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       keys: keys.map(redactKey).map((key) => ({
         ...key,
         usage: usageSnapshot[key.id] ?? { total: 0, success: 0, error: 0 }
-      }))
+      })),
+      usage: recentUsage.slice(0, 20),
+      healthEvents: recentHealthEvents
     };
   });
 
@@ -101,16 +151,31 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const parsedLimit = parseLimitQuery(request);
+    const query = keyUsageQuerySchema.parse(request.query);
+    const recentUsage = await app.usageRecorder.listRecent(500);
+    const entries = recentUsage.filter((entry) => entry.keyId === keyId).slice(0, query.limit);
+
     return {
       keyId,
-      summary: app.usageRecorder.summary(keyId),
-      entries: app.usageRecorder.recent(keyId, parsedLimit)
+      summary: usageSnapshotFromEntries(entries),
+      entries
     };
   });
 
   app.post("/admin/api/keys", async (request, reply) => {
-    const body = upsertKeySchema.parse(request.body);
+    const parsedBody = upsertKeyRequestSchema.parse(request.body);
+    const resolvedBody = resolveUpsertKeyRequest(parsedBody);
+
+    if (!resolvedBody.ok) {
+      return reply.status(400).send({
+        error: {
+          code: resolvedBody.code,
+          message: resolvedBody.message
+        }
+      });
+    }
+
+    const body = resolvedBody.value;
 
     if (!app.providerRegistry.has(body.provider)) {
       app.providerRegistry.register(new OpenAIAdapter({
@@ -141,6 +206,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         }
       });
     }
+
+    await app.healthEventRecorder.record({
+      type: "key_status_changed",
+      level: body.status === "disabled" ? "warn" : "info",
+      keyId,
+      code: body.status,
+      message: `Key status changed to ${body.status}`
+    });
 
     return {
       ok: true
@@ -196,6 +269,60 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   });
 }
 
+function resolveUpsertKeyRequest(input: UpsertKeyRequest): {
+  ok: true;
+  value: ResolvedUpsertKeyRequest;
+} | {
+  ok: false;
+  code: string;
+  message: string;
+} {
+  const preset = input.presetId === undefined ? undefined : findProviderPreset(input.presetId);
+
+  if (input.presetId !== undefined && preset === undefined) {
+    return {
+      ok: false,
+      code: "unknown_provider_preset",
+      message: `Unknown provider preset: ${input.presetId}`
+    };
+  }
+
+  const provider = input.provider ?? preset?.provider;
+  const providerType = input.providerType ?? preset?.providerType ?? "openai";
+  const baseUrl = input.baseUrl ?? preset?.baseUrl;
+  const pool = input.pool ?? preset?.pool;
+  const model = input.model ?? preset?.model ?? "gpt-4.1-mini";
+  const missingFields: string[] = [];
+
+  if (provider === undefined) missingFields.push("provider");
+  if (baseUrl === undefined) missingFields.push("baseUrl");
+  if (pool === undefined) missingFields.push("pool");
+
+  if (provider === undefined || baseUrl === undefined || pool === undefined) {
+    return {
+      ok: false,
+      code: "incomplete_key_configuration",
+      message: `Missing required key configuration fields: ${missingFields.join(", ")}`
+    };
+  }
+
+  const resolved: ResolvedUpsertKeyRequest = {
+    provider,
+    providerType,
+    baseUrl,
+    pool,
+    model,
+    id: input.id,
+    value: input.value,
+    weight: input.weight
+  };
+
+  if (input.rpmLimit !== undefined) resolved.rpmLimit = input.rpmLimit;
+  if (input.dailyRequestLimit !== undefined) resolved.dailyRequestLimit = input.dailyRequestLimit;
+
+  return { ok: true, value: resolved };
+}
+
 function getKeyId(request: FastifyRequest): string {
   const params = z.object({
     id: z.string().min(1)
@@ -204,24 +331,7 @@ function getKeyId(request: FastifyRequest): string {
   return decodeURIComponent(params.id);
 }
 
-function parseLimitQuery(request: FastifyRequest, fallback = 64, max = 256): number {
-  const query = request.query as { limit?: unknown } | undefined;
-  const raw = query?.limit;
-
-  if (raw === undefined || raw === null || raw === "") {
-    return fallback;
-  }
-
-  const parsed = Number(raw);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return fallback;
-  }
-
-  return Math.min(max, Math.floor(parsed));
-}
-
-function toApiKeyRecord(input: z.infer<typeof upsertKeySchema>): ApiKeyRecord {
+function toApiKeyRecord(input: ResolvedUpsertKeyRequest): ApiKeyRecord {
   const record: ApiKeyRecord = {
     id: input.id,
     provider: input.provider,
@@ -232,27 +342,21 @@ function toApiKeyRecord(input: z.infer<typeof upsertKeySchema>): ApiKeyRecord {
     failureCount: 0
   };
 
-  if (input.rpmLimit !== undefined) {
-    record.rpmLimit = input.rpmLimit;
-  }
-
-  if (input.dailyRequestLimit !== undefined) {
-    record.dailyRequestLimit = input.dailyRequestLimit;
-  }
+  if (input.rpmLimit !== undefined) record.rpmLimit = input.rpmLimit;
+  if (input.dailyRequestLimit !== undefined) record.dailyRequestLimit = input.dailyRequestLimit;
 
   return record;
 }
 
 function redactKey(key: ApiKeyRecord): Omit<ApiKeyRecord, "value"> & { valuePreview: string } {
   const { value, ...safeKey } = key;
-
   return {
     ...safeKey,
     valuePreview: previewSecret(key.value)
   };
 }
 
-function upsertRuntimeProviderConfig(app: FastifyInstance, input: z.infer<typeof upsertKeySchema>): void {
+function upsertRuntimeProviderConfig(app: FastifyInstance, input: ResolvedUpsertKeyRequest): void {
   const provider = app.config.providers[input.provider];
 
   if (provider) {
@@ -266,7 +370,7 @@ function upsertRuntimeProviderConfig(app: FastifyInstance, input: z.infer<typeof
   };
 }
 
-function upsertRuntimePoolConfig(app: FastifyInstance, input: z.infer<typeof upsertKeySchema>): void {
+function upsertRuntimePoolConfig(app: FastifyInstance, input: ResolvedUpsertKeyRequest): void {
   const pool = app.config.pools[input.pool];
 
   if (!pool) {
@@ -311,4 +415,49 @@ function parseJson(input: string): unknown {
   } catch {
     return input;
   }
+}
+
+interface UsageSummary {
+  total: number;
+  success: number;
+  error: number;
+  lastUsedAt?: string;
+}
+
+interface KeyUsageEntryLike {
+  keyId?: string;
+  outcome: string;
+  createdAt: Date;
+}
+
+function buildUsageSnapshot(entries: ReadonlyArray<KeyUsageEntryLike>): Record<string, UsageSummary> {
+  const result: Record<string, UsageSummary> = {};
+  for (const entry of entries) {
+    if (!entry.keyId) continue;
+    const existing = result[entry.keyId] ?? { total: 0, success: 0, error: 0 };
+    existing.total += 1;
+    if (entry.outcome === "success") existing.success += 1;
+    else existing.error += 1;
+    const iso = entry.createdAt.toISOString();
+    if (!existing.lastUsedAt || iso > existing.lastUsedAt) {
+      existing.lastUsedAt = iso;
+    }
+    result[entry.keyId] = existing;
+  }
+  return result;
+}
+
+function usageSnapshotFromEntries(entries: ReadonlyArray<KeyUsageEntryLike>): UsageSummary {
+  const summary: UsageSummary = { total: entries.length, success: 0, error: 0 };
+  for (const entry of entries) {
+    if (entry.outcome === "success") summary.success += 1;
+    else summary.error += 1;
+  }
+  if (entries.length > 0) {
+    const first = entries[0];
+    if (first) {
+      summary.lastUsedAt = first.createdAt.toISOString();
+    }
+  }
+  return summary;
 }
