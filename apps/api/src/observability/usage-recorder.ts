@@ -15,9 +15,20 @@ export interface UsageRecord {
   createdAt: Date;
 }
 
+export interface UsageRecordQuery {
+  limit?: number;
+  route?: string;
+  model?: string;
+  pool?: string;
+  provider?: string;
+  keyId?: string;
+  outcome?: UsageOutcome;
+  errorCode?: string;
+}
+
 export interface UsageRecorder {
   record(record: Omit<UsageRecord, "id" | "createdAt">): Promise<UsageRecord>;
-  listRecent(limit?: number): Promise<UsageRecord[]>;
+  listRecent(query?: UsageRecordQuery): Promise<UsageRecord[]>;
 }
 
 export class InMemoryUsageRecorder implements UsageRecorder {
@@ -44,7 +55,21 @@ export class InMemoryUsageRecorder implements UsageRecorder {
     return usageRecord;
   }
 
-  async listRecent(limit = 50): Promise<UsageRecord[]> {
-    return this.records.slice(0, limit);
+  async listRecent(query: UsageRecordQuery = {}): Promise<UsageRecord[]> {
+    const limit = query.limit ?? 50;
+    return this.records
+      .filter((record) => matchesUsageRecordQuery(record, query))
+      .slice(0, limit);
   }
+}
+
+function matchesUsageRecordQuery(record: UsageRecord, query: UsageRecordQuery): boolean {
+  if (query.route !== undefined && record.route !== query.route) return false;
+  if (query.model !== undefined && record.model !== query.model) return false;
+  if (query.pool !== undefined && record.pool !== query.pool) return false;
+  if (query.provider !== undefined && record.provider !== query.provider) return false;
+  if (query.keyId !== undefined && record.keyId !== query.keyId) return false;
+  if (query.outcome !== undefined && record.outcome !== query.outcome) return false;
+  if (query.errorCode !== undefined && record.errorCode !== query.errorCode) return false;
+  return true;
 }

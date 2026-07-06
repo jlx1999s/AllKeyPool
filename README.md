@@ -169,12 +169,16 @@ curl 'http://localhost:3000/admin/api/usage?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
+Usage can be filtered by `route`, `model`, `pool`, `provider`, `keyId`, `outcome`, and `errorCode`.
+
 Recent health events API:
 
 ```bash
 curl 'http://localhost:3000/admin/api/health-events?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
+
+Health events can be filtered by `type`, `level`, `requestId`, `provider`, `keyId`, and `code`.
 
 Recent admin audit log API:
 

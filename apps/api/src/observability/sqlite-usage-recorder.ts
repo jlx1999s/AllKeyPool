@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { UsageOutcome, UsageRecord, UsageRecorder } from "./usage-recorder.js";
+import type { UsageOutcome, UsageRecord, UsageRecordQuery, UsageRecorder } from "./usage-recorder.js";
 
 interface UsageRecordRow {
   id: string;
@@ -50,12 +50,42 @@ export class SqliteUsageRecorder implements UsageRecorder {
     return usageRecord;
   }
 
-  async listRecent(limit = 50): Promise<UsageRecord[]> {
+  async listRecent(query: UsageRecordQuery = {}): Promise<UsageRecord[]> {
+    const limit = query.limit ?? 50;
+    const filters = buildWhereClause(query);
+
     return this.database
-      .prepare("SELECT * FROM usage_records ORDER BY created_at DESC, id DESC LIMIT ?")
-      .all(limit)
+      .prepare(`SELECT * FROM usage_records ${filters.whereSql} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .all(...filters.params, limit)
       .map((row) => rowToUsageRecord(row as unknown as UsageRecordRow));
   }
+}
+
+function buildWhereClause(query: UsageRecordQuery): {
+  whereSql: string;
+  params: string[];
+} {
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  addFilter(clauses, params, "route", query.route);
+  addFilter(clauses, params, "model", query.model);
+  addFilter(clauses, params, "pool", query.pool);
+  addFilter(clauses, params, "provider", query.provider);
+  addFilter(clauses, params, "key_id", query.keyId);
+  addFilter(clauses, params, "outcome", query.outcome);
+  addFilter(clauses, params, "error_code", query.errorCode);
+
+  return {
+    whereSql: clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`,
+    params
+  };
+}
+
+function addFilter(clauses: string[], params: string[], column: string, value: string | undefined): void {
+  if (value === undefined) return;
+  clauses.push(`${column} = ?`);
+  params.push(value);
 }
 
 function rowToUsageRecord(row: UsageRecordRow): UsageRecord {

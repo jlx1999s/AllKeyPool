@@ -2,6 +2,8 @@ import type { ApiKeyRecord } from "@keypool/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AuditActor, AuditLogQuery } from "../../observability/audit-log-recorder.js";
+import type { HealthEventQuery } from "../../observability/health-event-recorder.js";
+import type { UsageRecordQuery } from "../../observability/usage-recorder.js";
 import { findProviderPreset, providerPresets } from "../../providers/provider-presets.js";
 import {
   restoreRuntimeConfigFromKeys,
@@ -49,12 +51,36 @@ const chatTestSchema = z.object({
 });
 
 const usageQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(200).default(50)
+  limit: z.coerce.number().int().positive().max(200).default(50),
+  route: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  pool: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
+  keyId: z.string().min(1).optional(),
+  outcome: z.enum(["success", "error"]).optional(),
+  errorCode: z.string().min(1).optional()
 });
 
 const healthEventsQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(200).default(50)
+  limit: z.coerce.number().int().positive().max(200).default(50),
+  type: z.enum([
+    "provider_attempt_succeeded",
+    "provider_attempt_failed",
+    "key_exhausted",
+    "key_degraded",
+    "key_cooling_down",
+    "key_recovered",
+    "key_status_changed"
+  ]).optional(),
+  level: z.enum(["info", "warn", "error"]).optional(),
+  requestId: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
+  keyId: z.string().min(1).optional(),
+  code: z.string().min(1).optional()
 });
+
+type UsageQueryRequest = z.infer<typeof usageQuerySchema>;
+type HealthEventsQueryRequest = z.infer<typeof healthEventsQuerySchema>;
 
 const auditLogsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(50),
@@ -113,14 +139,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/admin/api/usage", async (request) => {
     const query = usageQuerySchema.parse(request.query);
     return {
-      usage: await app.usageRecorder.listRecent(query.limit)
+      usage: await app.usageRecorder.listRecent(toUsageRecordQuery(query))
     };
   });
 
   app.get("/admin/api/health-events", async (request) => {
     const query = healthEventsQuerySchema.parse(request.query);
     return {
-      events: await app.healthEventRecorder.listRecent(query.limit)
+      events: await app.healthEventRecorder.listRecent(toHealthEventQuery(query))
     };
   });
 
@@ -133,8 +159,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/admin/api/state", async () => {
     const keys = await app.apiKeyRepository.list();
-    const recentUsage = await app.usageRecorder.listRecent(500);
-    const recentHealthEvents = await app.healthEventRecorder.listRecent(20);
+    const recentUsage = await app.usageRecorder.listRecent({ limit: 500 });
+    const recentHealthEvents = await app.healthEventRecorder.listRecent({ limit: 20 });
     const recentAuditLogs = await app.auditLogRecorder.listRecent({ limit: 20 });
     const usageSnapshot = buildUsageSnapshot(recentUsage);
 
@@ -181,7 +207,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const query = keyUsageQuerySchema.parse(request.query);
-    const recentUsage = await app.usageRecorder.listRecent(500);
+    const recentUsage = await app.usageRecorder.listRecent({ limit: 500, keyId });
     const entries = recentUsage.filter((entry) => entry.keyId === keyId).slice(0, query.limit);
 
     return {
@@ -419,6 +445,37 @@ function getAdminActor(): AuditActor {
     type: "admin",
     id: "admin"
   };
+}
+
+function toUsageRecordQuery(input: UsageQueryRequest): UsageRecordQuery {
+  const query: UsageRecordQuery = {
+    limit: input.limit
+  };
+
+  if (input.route !== undefined) query.route = input.route;
+  if (input.model !== undefined) query.model = input.model;
+  if (input.pool !== undefined) query.pool = input.pool;
+  if (input.provider !== undefined) query.provider = input.provider;
+  if (input.keyId !== undefined) query.keyId = input.keyId;
+  if (input.outcome !== undefined) query.outcome = input.outcome;
+  if (input.errorCode !== undefined) query.errorCode = input.errorCode;
+
+  return query;
+}
+
+function toHealthEventQuery(input: HealthEventsQueryRequest): HealthEventQuery {
+  const query: HealthEventQuery = {
+    limit: input.limit
+  };
+
+  if (input.type !== undefined) query.type = input.type;
+  if (input.level !== undefined) query.level = input.level;
+  if (input.requestId !== undefined) query.requestId = input.requestId;
+  if (input.provider !== undefined) query.provider = input.provider;
+  if (input.keyId !== undefined) query.keyId = input.keyId;
+  if (input.code !== undefined) query.code = input.code;
+
+  return query;
 }
 
 function toAuditLogQuery(input: AuditLogsQueryRequest): AuditLogQuery {

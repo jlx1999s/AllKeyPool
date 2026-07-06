@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type {
   HealthEvent,
   HealthEventLevel,
+  HealthEventQuery,
   HealthEventRecorder,
   HealthEventType
 } from "./health-event-recorder.js";
@@ -53,12 +54,41 @@ export class SqliteHealthEventRecorder implements HealthEventRecorder {
     return healthEvent;
   }
 
-  async listRecent(limit = 50): Promise<HealthEvent[]> {
+  async listRecent(query: HealthEventQuery = {}): Promise<HealthEvent[]> {
+    const limit = query.limit ?? 50;
+    const filters = buildWhereClause(query);
+
     return this.database
-      .prepare("SELECT * FROM health_events ORDER BY created_at DESC, id DESC LIMIT ?")
-      .all(limit)
+      .prepare(`SELECT * FROM health_events ${filters.whereSql} ORDER BY created_at DESC, id DESC LIMIT ?`)
+      .all(...filters.params, limit)
       .map((row) => rowToHealthEvent(row as unknown as HealthEventRow));
   }
+}
+
+function buildWhereClause(query: HealthEventQuery): {
+  whereSql: string;
+  params: string[];
+} {
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  addFilter(clauses, params, "type", query.type);
+  addFilter(clauses, params, "level", query.level);
+  addFilter(clauses, params, "request_id", query.requestId);
+  addFilter(clauses, params, "provider", query.provider);
+  addFilter(clauses, params, "key_id", query.keyId);
+  addFilter(clauses, params, "code", query.code);
+
+  return {
+    whereSql: clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`,
+    params
+  };
+}
+
+function addFilter(clauses: string[], params: string[], column: string, value: string | undefined): void {
+  if (value === undefined) return;
+  clauses.push(`${column} = ?`);
+  params.push(value);
 }
 
 function rowToHealthEvent(row: HealthEventRow): HealthEvent {

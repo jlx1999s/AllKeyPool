@@ -23,9 +23,19 @@ export interface HealthEvent {
   createdAt: Date;
 }
 
+export interface HealthEventQuery {
+  limit?: number;
+  type?: HealthEventType;
+  level?: HealthEventLevel;
+  requestId?: string;
+  provider?: string;
+  keyId?: string;
+  code?: string;
+}
+
 export interface HealthEventRecorder {
   record(event: Omit<HealthEvent, "id" | "createdAt">): Promise<HealthEvent>;
-  listRecent(limit?: number): Promise<HealthEvent[]>;
+  listRecent(query?: HealthEventQuery): Promise<HealthEvent[]>;
 }
 
 export class InMemoryHealthEventRecorder implements HealthEventRecorder {
@@ -52,7 +62,20 @@ export class InMemoryHealthEventRecorder implements HealthEventRecorder {
     return healthEvent;
   }
 
-  async listRecent(limit = 50): Promise<HealthEvent[]> {
-    return this.events.slice(0, limit);
+  async listRecent(query: HealthEventQuery = {}): Promise<HealthEvent[]> {
+    const limit = query.limit ?? 50;
+    return this.events
+      .filter((event) => matchesHealthEventQuery(event, query))
+      .slice(0, limit);
   }
+}
+
+function matchesHealthEventQuery(event: HealthEvent, query: HealthEventQuery): boolean {
+  if (query.type !== undefined && event.type !== query.type) return false;
+  if (query.level !== undefined && event.level !== query.level) return false;
+  if (query.requestId !== undefined && event.requestId !== query.requestId) return false;
+  if (query.provider !== undefined && event.provider !== query.provider) return false;
+  if (query.keyId !== undefined && event.keyId !== query.keyId) return false;
+  if (query.code !== undefined && event.code !== query.code) return false;
+  return true;
 }

@@ -116,6 +116,19 @@ describe("POST /v1/chat/completions", () => {
         outcome: "success"
       })
     ]);
+    const filteredUsageResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage?provider=openai&keyId=openai-key-1&outcome=success",
+      headers: adminHeaders
+    });
+
+    expect(filteredUsageResponse.json().usage).toEqual([
+      expect.objectContaining({
+        provider: "openai",
+        keyId: "openai-key-1",
+        outcome: "success"
+      })
+    ]);
 
     await app.close();
     vi.unstubAllGlobals();
@@ -293,6 +306,20 @@ describe("POST /v1/chat/completions", () => {
         message: "Rate limit exceeded"
       })
     ]));
+    const filteredHealthEventsResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/health-events?type=provider_attempt_failed&level=warn&keyId=openai-key-1&code=rate_limited",
+      headers: adminHeaders
+    });
+
+    expect(filteredHealthEventsResponse.json().events).toEqual([
+      expect.objectContaining({
+        type: "provider_attempt_failed",
+        level: "warn",
+        keyId: "openai-key-1",
+        code: "rate_limited"
+      })
+    ]);
 
     await app.close();
     vi.unstubAllGlobals();

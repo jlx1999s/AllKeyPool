@@ -121,6 +121,18 @@ describe("SQLite storage", () => {
       outcome: "success",
       latencyMs: 12
     });
+    await usageRecorder.record({
+      requestId: "req-2",
+      route: "chat.completions",
+      model: "gpt-4.1-mini",
+      pool: "text_generation",
+      provider: "openai",
+      keyId: "key-2",
+      statusCode: 429,
+      outcome: "error",
+      errorCode: "rate_limited",
+      latencyMs: 8
+    });
     await healthEventRecorder.record({
       type: "provider_attempt_succeeded",
       level: "info",
@@ -132,6 +144,16 @@ describe("SQLite storage", () => {
       metadata: {
         attempt: 1
       }
+    });
+    await healthEventRecorder.record({
+      type: "provider_attempt_failed",
+      level: "warn",
+      requestId: "req-2",
+      provider: "openai",
+      keyId: "key-2",
+      statusCode: 429,
+      code: "rate_limited",
+      message: "Rate limit exceeded"
     });
     await auditLogRecorder.record({
       action: "key_created",
@@ -162,13 +184,36 @@ describe("SQLite storage", () => {
 
     await expect(usageRecorder.listRecent()).resolves.toEqual([
       expect.objectContaining({
+        requestId: "req-2",
+        keyId: "key-2",
+        outcome: "error",
+        errorCode: "rate_limited",
+        createdAt: expect.any(Date) as Date
+      }),
+      expect.objectContaining({
         requestId: "req-1",
         keyId: "key-1",
         outcome: "success",
         createdAt: expect.any(Date) as Date
       })
     ]);
+    await expect(usageRecorder.listRecent({
+      keyId: "key-1",
+      outcome: "success"
+    })).resolves.toEqual([
+      expect.objectContaining({
+        requestId: "req-1",
+        keyId: "key-1",
+        outcome: "success"
+      })
+    ]);
     await expect(healthEventRecorder.listRecent()).resolves.toEqual([
+      expect.objectContaining({
+        type: "provider_attempt_failed",
+        keyId: "key-2",
+        code: "rate_limited",
+        createdAt: expect.any(Date) as Date
+      }),
       expect.objectContaining({
         type: "provider_attempt_succeeded",
         keyId: "key-1",
@@ -176,6 +221,17 @@ describe("SQLite storage", () => {
           attempt: 1
         },
         createdAt: expect.any(Date) as Date
+      })
+    ]);
+    await expect(healthEventRecorder.listRecent({
+      type: "provider_attempt_succeeded",
+      keyId: "key-1",
+      level: "info"
+    })).resolves.toEqual([
+      expect.objectContaining({
+        type: "provider_attempt_succeeded",
+        keyId: "key-1",
+        level: "info"
       })
     ]);
     await expect(auditLogRecorder.listRecent()).resolves.toEqual([
