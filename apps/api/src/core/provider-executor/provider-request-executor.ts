@@ -11,8 +11,9 @@ import type { RetryPolicy } from "../retry/retry-policy.js";
 export interface ProviderRequestExecutorOptions {
   scheduler: SchedulerService;
   retryPolicy: RetryPolicy;
-  onAttemptFailure?: (event: ProviderAttemptFailureEvent) => void;
-  onKeyExhausted?: (event: ProviderKeyExhaustedEvent) => void;
+  onAttemptFailure?: (event: ProviderAttemptFailureEvent) => void | Promise<void>;
+  onAttemptSuccess?: (event: ProviderAttemptSuccessEvent) => void | Promise<void>;
+  onKeyExhausted?: (event: ProviderKeyExhaustedEvent) => void | Promise<void>;
 }
 
 export interface ProviderExecuteOptions {
@@ -23,9 +24,24 @@ export interface ProviderExecuteOptions {
 }
 
 export interface ProviderAttemptFailureEvent {
+  requestId: string;
+  pool: string;
+  provider?: string;
+  model?: string;
   providerError: ProviderError;
   keyId: string;
   attempt: number;
+}
+
+export interface ProviderAttemptSuccessEvent {
+  requestId: string;
+  pool: string;
+  provider?: string;
+  model?: string;
+  keyId: string;
+  attempt: number;
+  statusCode: number;
+  latencyMs: number;
 }
 
 export interface ProviderKeyExhaustedEvent {
@@ -54,30 +70,46 @@ export class ProviderRequestExecutor {
         },
         options.strategy
       ).catch((error: unknown) => {
-        this.options.onKeyExhausted?.({
+        return {
           error,
           attemptedKeyIds
-        });
-
-        return undefined;
+        };
       });
 
-      if (!selected) {
+      if ("error" in selected) {
+        await this.options.onKeyExhausted?.(selected);
         break;
       }
 
       attemptedKeyIds.push(selected.key.id);
 
       try {
-        return await options.adapter.send(options.request, {
+        const startedAt = Date.now();
+        const response = await options.adapter.send(options.request, {
           requestId: options.schedulingContext.requestId,
           key: selected.key
         });
+        await this.options.onAttemptSuccess?.({
+          requestId: options.schedulingContext.requestId,
+          pool: options.schedulingContext.pool,
+          ...(options.schedulingContext.provider === undefined ? {} : { provider: options.schedulingContext.provider }),
+          ...(options.schedulingContext.model === undefined ? {} : { model: options.schedulingContext.model }),
+          keyId: selected.key.id,
+          attempt,
+          statusCode: response.statusCode,
+          latencyMs: Date.now() - startedAt
+        });
+
+        return response;
       } catch (error) {
         const providerError = options.adapter.normalizeError(error);
         lastProviderError = providerError;
 
-        this.options.onAttemptFailure?.({
+        await this.options.onAttemptFailure?.({
+          requestId: options.schedulingContext.requestId,
+          pool: options.schedulingContext.pool,
+          ...(options.schedulingContext.provider === undefined ? {} : { provider: options.schedulingContext.provider }),
+          ...(options.schedulingContext.model === undefined ? {} : { model: options.schedulingContext.model }),
           providerError,
           keyId: selected.key.id,
           attempt
@@ -99,4 +131,3 @@ export class ProviderRequestExecutor {
     });
   }
 }
-

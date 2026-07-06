@@ -65,14 +65,20 @@ describe("admin routes", () => {
   it("exposes provider presets including the official MiniMax preset", async () => {
     const app = await buildApp({ config: config() });
 
-    const response = await app.inject({
+    const stateResponse = await app.inject({
       method: "GET",
       url: "/admin/api/state",
       headers: adminHeaders
     });
+    const presetsResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/provider-presets",
+      headers: adminHeaders
+    });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().presets).toEqual(expect.arrayContaining([
+    expect(stateResponse.statusCode).toBe(200);
+    expect(presetsResponse.statusCode).toBe(200);
+    const expectedPresets = expect.arrayContaining([
       expect.objectContaining({
         id: "minimax-official",
         provider: "minimax",
@@ -82,7 +88,9 @@ describe("admin routes", () => {
         model: "MiniMax-M3",
         keyIdPrefix: "minimax"
       })
-    ]));
+    ]);
+    expect(stateResponse.json().presets).toEqual(expectedPresets);
+    expect(presetsResponse.json().presets).toEqual(expectedPresets);
 
     await app.close();
   });
@@ -118,6 +126,21 @@ describe("admin routes", () => {
       }
     });
     expect(disabledResponse.statusCode).toBe(200);
+    const healthEventsResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/health-events",
+      headers: adminHeaders
+    });
+    expect(healthEventsResponse.statusCode).toBe(200);
+    expect(healthEventsResponse.json().events).toEqual([
+      expect.objectContaining({
+        type: "key_status_changed",
+        level: "warn",
+        keyId: "openai-prod-1",
+        code: "disabled",
+        message: "Key status changed to disabled"
+      })
+    ]);
 
     let state = (await app.inject({
       method: "GET",
@@ -148,6 +171,12 @@ describe("admin routes", () => {
           weight: 2,
           rpmLimit: 10,
           valuePreview: "sk-t...cret"
+        }
+      ],
+      healthEvents: [
+        {
+          type: "key_status_changed",
+          keyId: "openai-prod-1"
         }
       ]
     });
@@ -233,6 +262,81 @@ describe("admin routes", () => {
       ]
     });
     expect(JSON.stringify(state)).not.toContain("sk-minimax-test-secret");
+
+    await app.close();
+  });
+
+  it("adds a MiniMax runtime key from preset id only", async () => {
+    const app = await buildApp({ config: config() });
+
+    const addResponse = await app.inject({
+      method: "POST",
+      url: "/admin/api/keys",
+      headers: adminHeaders,
+      payload: {
+        presetId: "minimax-official",
+        id: "minimax-prod-2",
+        value: "sk-minimax-preset-secret",
+        weight: 3
+      }
+    });
+
+    expect(addResponse.statusCode).toBe(201);
+
+    const state = (await app.inject({
+      method: "GET",
+      url: "/admin/api/state",
+      headers: adminHeaders
+    })).json();
+
+    expect(state).toMatchObject({
+      providers: ["minimax"],
+      pools: [
+        {
+          name: "text_generation",
+          providers: [
+            {
+              provider: "minimax",
+              models: ["MiniMax-M3"]
+            }
+          ]
+        }
+      ],
+      keys: [
+        {
+          id: "minimax-prod-2",
+          provider: "minimax",
+          pool: "text_generation",
+          weight: 3,
+          valuePreview: "sk-m...cret"
+        }
+      ]
+    });
+
+    await app.close();
+  });
+
+  it("rejects unknown provider presets", async () => {
+    const app = await buildApp({ config: config() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/api/keys",
+      headers: adminHeaders,
+      payload: {
+        presetId: "not-a-provider",
+        id: "unknown-prod-1",
+        value: "sk-unknown-secret"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "unknown_provider_preset",
+        message: "Unknown provider preset: not-a-provider"
+      }
+    });
 
     await app.close();
   });

@@ -20,6 +20,8 @@ export class SchedulerService {
       throw new Error(`Unknown scheduling strategy: ${strategyName}`);
     }
 
+    await this.apiKeyRepository.releaseExpiredCooldowns(new Date());
+
     const keys = await this.apiKeyRepository.findByPool(
       context.pool,
       context.provider ? { provider: context.provider } : {}

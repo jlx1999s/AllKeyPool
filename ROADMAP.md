@@ -51,7 +51,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 ## v0.3 — Resilience
 - ⏳ Circuit breaker (Closed / Open / Half-Open)
 - ⏳ Fallback chain (provider-level)
-- ⏳ Cooldown & auto-recovery for failing keys
+- ✅ Cooldown & auto-recovery for failing keys
 - ⏳ Prometheus `/metrics` endpoint
 - ⏳ HTTP client with retry, backoff, timeout
 
@@ -60,12 +60,20 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ In-memory key add/update
 - ✅ Provider presets for key creation
 - ✅ MiniMax official OpenAI-compatible preset
+- ✅ Preset catalog API
+- ✅ Preset id based key creation
 - ✅ Bearer-token protected admin APIs
 - ✅ Key enable/disable/delete
 - ✅ Health test
 - ✅ OpenAI-compatible chat test
+- ✅ In-memory usage recorder
+- ✅ Admin recent usage API and table
+- ✅ In-memory health event recorder
+- ✅ Admin recent health event API and table
+- ✅ Automatic degraded / cooling_down key states
+- ✅ Cooldown expiry and auto-recovery
 - ⏳ Persist config changes safely
-- ⏳ Usage and health event timeline
+- ⏳ Usage and health event filtering
 
 ## v0.4 — Task-level API
 - ⏳ `tasks.*` registry — script / storyboard / image / video / tts / review

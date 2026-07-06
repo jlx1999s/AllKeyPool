@@ -10,11 +10,12 @@ const chatCompletionRequestSchema = z.object({
 
 export async function registerProxyRoutes(app: FastifyInstance): Promise<void> {
   app.post("/v1/chat/completions", async (request, reply) => {
+    const startedAt = Date.now();
     const body = chatCompletionRequestSchema.parse(request.body);
-    const route = resolveChatCompletionRoute(app, body.model);
-    const adapter = app.providerRegistry.get(route.providerName);
 
     try {
+      const route = resolveChatCompletionRoute(app, body.model);
+      const adapter = app.providerRegistry.get(route.providerName);
       const providerResponse = await app.providerRequestExecutor.execute({
         adapter,
         request: {
@@ -39,8 +40,28 @@ export async function registerProxyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(providerResponse.statusCode).send(providerResponse.body);
     } catch (error) {
       if (!(error instanceof ProviderRequestFailedError)) {
+        await app.usageRecorder.record({
+          requestId: request.id,
+          route: "chat.completions",
+          model: body.model,
+          statusCode: getHttpStatusCode(error),
+          outcome: "error",
+          errorCode: "request_error",
+          latencyMs: Date.now() - startedAt
+        });
         throw error;
       }
+
+      await app.usageRecorder.record({
+        requestId: request.id,
+        route: "chat.completions",
+        model: body.model,
+        provider: error.providerError.provider,
+        statusCode: getProviderErrorStatusCode(error.providerError),
+        outcome: "error",
+        errorCode: error.providerError.code,
+        latencyMs: Date.now() - startedAt
+      });
 
       return sendProviderError(reply, error.providerError, request.id);
     }
@@ -52,7 +73,7 @@ function sendProviderError(
   providerError: ProviderError,
   requestId: string
 ) {
-  const statusCode = providerError.authenticationFailed ? 502 : providerError.statusCode ?? 502;
+  const statusCode = getProviderErrorStatusCode(providerError);
 
   return reply.status(statusCode).send({
     error: {
@@ -63,6 +84,18 @@ function sendProviderError(
       requestId
     }
   });
+}
+
+function getProviderErrorStatusCode(providerError: ProviderError): number {
+  return providerError.authenticationFailed ? 502 : providerError.statusCode ?? 502;
+}
+
+function getHttpStatusCode(error: unknown): number {
+  if (error instanceof Error && "statusCode" in error && typeof error.statusCode === "number") {
+    return error.statusCode;
+  }
+
+  return 500;
 }
 
 interface ChatCompletionRoute {

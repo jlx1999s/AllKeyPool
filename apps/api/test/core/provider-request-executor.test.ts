@@ -54,10 +54,12 @@ describe("ProviderRequestExecutor", () => {
       normalizeError: vi.fn(() => rateLimitError())
     };
     const onAttemptFailure = vi.fn();
+    const onAttemptSuccess = vi.fn();
     const executor = new ProviderRequestExecutor({
       scheduler,
       retryPolicy: new RetryPolicy({ maxAttempts: 3 }),
-      onAttemptFailure
+      onAttemptFailure,
+      onAttemptSuccess
     });
 
     await expect(executor.execute({
@@ -82,6 +84,14 @@ describe("ProviderRequestExecutor", () => {
     expect(onAttemptFailure).toHaveBeenCalledWith(expect.objectContaining({
       keyId: "key-1",
       attempt: 1
+    }));
+    expect(onAttemptSuccess).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "req-1",
+      pool: "text_generation",
+      provider: "openai",
+      keyId: "key-2",
+      attempt: 2,
+      statusCode: 200
     }));
   });
 

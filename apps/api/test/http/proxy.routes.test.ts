@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { buildApp } from "../../src/app.js";
 import type { KeyPoolConfig } from "../../src/config/schema.js";
 
+const adminHeaders = {
+  authorization: "Bearer keypool-admin-dev"
+};
+
 function config(): KeyPoolConfig {
   return {
     server: {
@@ -96,6 +100,22 @@ describe("POST /v1/chat/completions", () => {
         authorization: "Bearer secret-key"
       })
     }));
+    const usageResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage",
+      headers: adminHeaders
+    });
+
+    expect(usageResponse.json().usage).toEqual([
+      expect.objectContaining({
+        route: "chat.completions",
+        model: "gpt-4.1-mini",
+        provider: "openai",
+        keyId: "openai-key-1",
+        statusCode: 200,
+        outcome: "success"
+      })
+    ]);
 
     await app.close();
     vi.unstubAllGlobals();
@@ -125,6 +145,21 @@ describe("POST /v1/chat/completions", () => {
         message: "No configured provider pool supports model: unknown-model"
       }
     });
+    const usageResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage",
+      headers: adminHeaders
+    });
+
+    expect(usageResponse.json().usage).toEqual([
+      expect.objectContaining({
+        route: "chat.completions",
+        model: "unknown-model",
+        statusCode: 503,
+        outcome: "error",
+        errorCode: "request_error"
+      })
+    ]);
 
     await app.close();
   });
@@ -225,6 +260,114 @@ describe("POST /v1/chat/completions", () => {
       }
     });
     expect(fetchFn).toHaveBeenCalledTimes(1);
+    const usageResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/usage",
+      headers: adminHeaders
+    });
+
+    expect(usageResponse.json().usage).toEqual([
+      expect.objectContaining({
+        route: "chat.completions",
+        model: "gpt-4.1-mini",
+        provider: "openai",
+        statusCode: 429,
+        outcome: "error",
+        errorCode: "rate_limited"
+      })
+    ]);
+    const healthEventsResponse = await app.inject({
+      method: "GET",
+      url: "/admin/api/health-events",
+      headers: adminHeaders
+    });
+
+    expect(healthEventsResponse.json().events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "provider_attempt_failed",
+        level: "warn",
+        provider: "openai",
+        keyId: "openai-key-1",
+        statusCode: 429,
+        code: "rate_limited",
+        message: "Rate limit exceeded"
+      })
+    ]));
+
+    await app.close();
+    vi.unstubAllGlobals();
+  });
+
+  it("marks repeatedly failing keys as cooling down and skips them", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({
+      error: {
+        message: "Rate limit exceeded"
+      }
+    }), {
+      status: 429,
+      headers: {
+        "content-type": "application/json"
+      }
+    }));
+    vi.stubGlobal("fetch", fetchFn);
+    const app = await buildApp({ config: config() });
+
+    for (let index = 0; index < 3; index += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/chat/completions",
+        payload: {
+          model: "gpt-4.1-mini",
+          messages: [
+            {
+              role: "user",
+              content: "hello"
+            }
+          ]
+        }
+      });
+
+      expect(response.statusCode).toBe(429);
+    }
+
+    const state = (await app.inject({
+      method: "GET",
+      url: "/admin/api/state",
+      headers: adminHeaders
+    })).json();
+
+    expect(state.keys).toEqual([
+      expect.objectContaining({
+        id: "openai-key-1",
+        status: "cooling_down",
+        failureCount: 3
+      })
+    ]);
+    expect(state.healthEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "key_cooling_down",
+        level: "error",
+        keyId: "openai-key-1",
+        code: "cooling_down"
+      })
+    ]));
+
+    const skippedResponse = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        model: "gpt-4.1-mini",
+        messages: [
+          {
+            role: "user",
+            content: "hello"
+          }
+        ]
+      }
+    });
+
+    expect(skippedResponse.statusCode).toBe(502);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
 
     await app.close();
     vi.unstubAllGlobals();
