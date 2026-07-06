@@ -6,13 +6,14 @@ import { InMemoryQuotaManager, type QuotaManager } from "./core/quota/quota-mana
 import { RetryPolicy } from "./core/retry/retry-policy.js";
 import { SchedulerService } from "./core/scheduler/scheduler.js";
 import { createDefaultSchedulingStrategies } from "./core/scheduler/strategy-registry.js";
+import { InMemoryHealthEventRecorder, type HealthEventRecorder } from "./observability/health-event-recorder.js";
+import { InMemoryUsageRecorder, type UsageRecorder } from "./observability/usage-recorder.js";
 import { registerErrorHandler } from "./http/middleware/error-handler.js";
 import { registerRequestId } from "./http/middleware/request-id.js";
 import { registerHealthRoutes } from "./http/routes/health.routes.js";
 import { registerAdminRoutes } from "./http/routes/admin.routes.js";
+import { registerDemoRoutes } from "./http/routes/demo.routes.js";
 import { registerProxyRoutes } from "./http/routes/proxy.routes.js";
-import { InMemoryHealthEventRecorder, type HealthEventRecorder } from "./observability/health-event-recorder.js";
-import { InMemoryUsageRecorder, type UsageRecorder } from "./observability/usage-recorder.js";
 import { ProviderRegistry } from "./providers/provider-registry.js";
 import { registerConfiguredProviders } from "./providers/register-configured-providers.js";
 import { createAdminAuth, type AdminAuth } from "./security/admin-auth.js";
@@ -24,7 +25,13 @@ export interface BuildAppOptions {
   config: KeyPoolConfig;
 }
 
+function isFakeProviderEnabled(): boolean {
+  return process.env.KEYPOOL_FAKE_PROVIDER === "1"
+    || process.env.KEYPOOL_FAKE_PROVIDER === "true";
+}
+
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
+  const fakeProvider = isFakeProviderEnabled();
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
@@ -65,8 +72,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         retryable: event.providerError.retryable,
         rateLimited: event.providerError.rateLimited,
         keyId: event.keyId,
-        attempt: event.attempt
+        attempt: event.attempt,
+        latencyMs: event.latencyMs
       }, "Provider request failed");
+      // Note: usage recording for the final failure happens in the proxy
+      // route's catch block (single entry per logical request). The
+      // onAttemptFailure hook stays focused on observability + health.
       await healthEventRecorder.record({
         type: "provider_attempt_failed",
         level: event.providerError.authenticationFailed ? "error" : "warn",
@@ -104,6 +115,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       }
     },
     async onAttemptSuccess(event) {
+      app.log.debug({
+        keyId: event.keyId,
+        attempt: event.attempt,
+        latencyMs: event.latencyMs
+      }, "Provider request succeeded");
+
       await usageRecorder.record({
         requestId: event.requestId,
         route: "chat.completions",
@@ -163,7 +180,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     }
   });
   const providerRegistry = new ProviderRegistry();
-  registerConfiguredProviders(providerRegistry, options.config);
+  registerConfiguredProviders(providerRegistry, options.config, { fakeProvider });
   const adminAuth = createAdminAuth();
 
   app.decorate("config", options.config);
@@ -171,15 +188,18 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   app.decorate("quotaManager", quotaManager);
   app.decorate("healthEventRecorder", healthEventRecorder);
   app.decorate("usageRecorder", usageRecorder);
+  app.decorate("keyHealthService", keyHealthService);
   app.decorate("scheduler", scheduler);
   app.decorate("retryPolicy", retryPolicy);
   app.decorate("providerRequestExecutor", providerRequestExecutor);
   app.decorate("providerRegistry", providerRegistry);
   app.decorate("adminAuth", adminAuth);
+  app.decorate("fakeProvider", fakeProvider);
 
   registerRequestId(app);
   registerErrorHandler(app);
   await registerAdminRoutes(app);
+  await registerDemoRoutes(app);
   await registerHealthRoutes(app);
   await registerProxyRoutes(app);
 
@@ -193,10 +213,12 @@ declare module "fastify" {
     quotaManager: QuotaManager;
     healthEventRecorder: HealthEventRecorder;
     usageRecorder: UsageRecorder;
+    keyHealthService: KeyHealthService;
     scheduler: SchedulerService;
     retryPolicy: RetryPolicy;
     providerRequestExecutor: ProviderRequestExecutor;
     providerRegistry: ProviderRegistry;
     adminAuth: AdminAuth;
+    fakeProvider: boolean;
   }
 }

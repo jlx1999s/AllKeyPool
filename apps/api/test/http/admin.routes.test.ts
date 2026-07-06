@@ -37,7 +37,7 @@ describe("admin routes", () => {
 
     expect(adminResponse.statusCode).toBe(200);
     expect(adminResponse.headers["content-type"]).toContain("text/html");
-    expect(adminResponse.body).toContain("KeyPool Admin Console");
+    expect(adminResponse.body).toContain("KeyPool Console");
     expect(devResponse.statusCode).toBe(302);
     expect(devResponse.headers.location).toBe("/admin");
 

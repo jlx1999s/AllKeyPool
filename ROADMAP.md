@@ -48,6 +48,46 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ⏳ Per-key TPM rate limiting
 - ✅ In-memory key state store
 
+## v0.2.5 — Fake pool & observability
+- ✅ `FakeOpenAIAdapter` (no network, OpenAI-shaped responses with `servedBy` / `keyId` markers)
+- ✅ Failure DSL: `sequence` / `periodic` / `burst` / `probability`
+- ✅ YAML string spec parser for failure scripts
+- ✅ Static `config/keypool.fake.yaml` covering 6 strategies (RR, WRR, periodic 429, burst, chaos, RPM)
+- ✅ `KEYPOOL_FAKE_PROVIDER=1` env switch
+- ✅ `UsageRecorder` interface + `InMemoryUsageRecorder` (capacity 64 / key)
+- ✅ `ProviderRequestExecutor.onAttemptSuccess` hook with latency
+- ✅ Admin `GET /admin/api/state` exposes per-key usage summary
+- ✅ Admin `GET /admin/api/keys/:id/usage?limit=N` returns per-key timeline
+
+## v0.2.6 — Demo Runner
+- ✅ `POST /_demo/chat` endpoint with admin auth
+- ✅ Three modes: single / multi-turn / load
+- ✅ Per-call attempt chain via `ProviderRequestExecutor.attemptSink`
+- ✅ Sticky session simulation via caller-supplied `excludedKeyIds`
+- ✅ Summary metrics: success / failed / avg / p50 / p95 / distinct keys
+- ✅ Admin panel "Demo Runner" section with model picker, turns editor, results table, metric cards
+- ✅ Executor fix: caller-supplied `excludedKeyIds` no longer overwritten by `attemptedKeyIds`
+
+## v0.2.7 — Admin console rewrite
+- ✅ Sidebar IA: 6 pages (Overview / Demo Runner / Keys / Pools / Usage / Settings)
+- ✅ Topbar with brand mark, env pill, language switch, action buttons
+- ✅ Right-side drawer (Add Key form, Timeline details)
+- ✅ Toast notifications (4 kinds)
+- ✅ Hash routing for navigation
+- ✅ Sticky-header tables with toolbar (search + filter)
+- ✅ Pool cards grid
+- ✅ Empty states with primary CTAs
+- ✅ Stat grids with auto-fit layout
+- ✅ Settings page (auth, runtime, OpenAPI reference)
+
+## v0.2.8 — i18n
+- ✅ EN + zh-CN dictionaries, ~150 translation keys
+- ✅ `data-i18n` / `data-i18n-placeholder` / `data-i18n-title` attributes
+- ✅ `t(key, vars)` helper with `{var}` substitution
+- ✅ Language switch in topbar + auth card
+- ✅ localStorage persistence; browser-language auto-detect
+- ✅ CJK font fallbacks (PingFang SC, Microsoft YaHei)
+
 ## v0.3 — Resilience
 - ⏳ Circuit breaker (Closed / Open / Half-Open)
 - ⏳ Fallback chain (provider-level)

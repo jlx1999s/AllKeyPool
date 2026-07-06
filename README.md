@@ -30,6 +30,11 @@ KeyPool does exactly one thing — **pick the right key, for the right task, at 
 | 🧬 | OpenAI-compatible chat pass-through | ✅ basic done |
 | 🔁 | RetryPolicy + ProviderRequestExecutor | ✅ basic done |
 | 🛠️ | Token-protected admin console | ✅ basic done |
+| 🧪 | Fake provider pool + failure DSL | ✅ done |
+| 📈 | Per-key usage timeline | ✅ basic done |
+| 🎬 | Demo Runner endpoint + panel | ✅ done |
+| 🎨 | Sidebar/drawer/toast admin UI | ✅ done |
+| 🌐 | EN + zh-CN i18n | ✅ done |
 | 🪜 | Provider fallback chain | ⏳ v0.3 |
 | 📊 | Prometheus metrics | ⏳ v0.3 |
 | 🧩 | Multi-provider adapters (Anthropic, Gemini, custom) | ⏳ v0.2 |
@@ -170,6 +175,65 @@ curl http://localhost:3000/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{"model":"gpt-4.1-mini","messages":[{"role":"user","content":"hello"}]}'
 ```
+
+### Fake provider pool (for local testing & demos)
+
+To exercise the scheduler, retry policy, and quota manager without any real provider, start KeyPool with the bundled fake config:
+
+```bash
+KEYPOOL_CONFIG=./config/keypool.fake.yaml KEYPOOL_FAKE_PROVIDER=1 npm run dev
+```
+
+`FakeOpenAIAdapter` never makes a network call. Each `provider` / `key` in the fake yaml can carry a `script:` field that drives the response. Supported directives:
+
+- `sequence(ok, 429, 500)` — consume outcomes in order
+- `periodic(period=3, rate_limited)` — every Nth call returns the outcome
+- `burst(windowMs=1000, allowed=2, outcome=rate_limited)` — sliding-window burst limiter
+- `probability(p=0.1, outcome=server_error, seed=42)` — chaos injection
+
+Every response body includes a `servedBy` (last 4 chars of the keyId) and `keyId` field, so you can `curl` a few times and confirm round-robin / weighted-round-robin / cooldown steering with your own eyes. See `apps/api/src/providers/fake/fake-script.ts` for the full surface.
+
+### Demo Runner
+
+The `POST /_demo/chat` endpoint simulates a real user (or load test) and returns the **full per-call attempt chain** in a single response — including every retry, every key swap, and the reason for each swap. It powers the "Demo Runner" section at the top of the admin console, and is also `curl`-friendly:
+
+```bash
+curl -X POST http://localhost:3000/_demo/chat \
+  -H "x-admin-token: keypool-admin-dev" \
+  -H "content-type: application/json" \
+  -d '{"model":"fake-rl","prompt":"ping","count":4}'
+```
+
+Response shape:
+
+```jsonc
+{
+  "results": [
+    {
+      "turn": 1,
+      "status": 200,
+      "keyId": "rl-prod-2",
+      "attempt": 2,
+      "attempts": [
+        { "attempt": 1, "keyId": "rl-prod-1", "outcome": "error", "statusCode": 429, "errorCode": "rate_limited", "latencyMs": 4 },
+        { "attempt": 2, "keyId": "rl-prod-2", "outcome": "success", "statusCode": 200, "latencyMs": 5 }
+      ],
+      "responseText": "[fake:d-2] ping"
+    }
+  ],
+  "summary": { "total": 4, "success": 4, "distinctKeys": 3, "avgLatencyMs": 5, "p50LatencyMs": 5, "p95LatencyMs": 6 }
+}
+```
+
+Three modes in one endpoint:
+
+- **single** — one request, `count` defaults to 1
+- **multi** — pass `turns: ["a", "b", "c"]` for a multi-turn conversation
+- **load** — pass `count: N` and optional `intervalMs` for pressure tests
+
+Plus an optional `sessionId` to **pin all turns to the same key** (sticky session simulation, useful for previewing v0.3's planned sticky strategy).
+
+Auth: same admin token as `/admin/api/*`.
 
 ---
 
