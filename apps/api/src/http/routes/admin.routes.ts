@@ -63,6 +63,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/admin/api/state", async () => {
     const keys = await app.apiKeyRepository.list();
+    const usageSnapshot = app.usageRecorder.snapshot();
 
     return {
       server: app.config.server,
@@ -71,6 +72,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         enabled: app.adminAuth.enabled,
         usingDevToken: app.adminAuth.usingDevToken
       },
+      fakeProvider: app.fakeProvider,
       providers: app.providerRegistry.list().map((provider) => provider.name),
       presets: providerPresets,
       pools: Object.entries(app.config.pools).map(([name, pool]) => ({
@@ -79,7 +81,31 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
         providers: pool.providers
       })),
       tasks: app.config.tasks,
-      keys: keys.map(redactKey)
+      keys: keys.map(redactKey).map((key) => ({
+        ...key,
+        usage: usageSnapshot[key.id] ?? { total: 0, success: 0, error: 0 }
+      }))
+    };
+  });
+
+  app.get("/admin/api/keys/:id/usage", async (request, reply) => {
+    const keyId = getKeyId(request);
+    const key = await app.apiKeyRepository.findById(keyId);
+
+    if (!key) {
+      return reply.status(404).send({
+        error: {
+          code: "key_not_found",
+          message: `API key not found: ${keyId}`
+        }
+      });
+    }
+
+    const parsedLimit = parseLimitQuery(request);
+    return {
+      keyId,
+      summary: app.usageRecorder.summary(keyId),
+      entries: app.usageRecorder.recent(keyId, parsedLimit)
     };
   });
 
@@ -176,6 +202,23 @@ function getKeyId(request: FastifyRequest): string {
   }).parse(request.params);
 
   return decodeURIComponent(params.id);
+}
+
+function parseLimitQuery(request: FastifyRequest, fallback = 64, max = 256): number {
+  const query = request.query as { limit?: unknown } | undefined;
+  const raw = query?.limit;
+
+  if (raw === undefined || raw === null || raw === "") {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.floor(parsed));
 }
 
 function toApiKeyRecord(input: z.infer<typeof upsertKeySchema>): ApiKeyRecord {
