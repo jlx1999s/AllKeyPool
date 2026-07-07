@@ -144,6 +144,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/admin/api/usage", async (request) => {
     const query = usageQuerySchema.parse(request.query);
     const usageQuery = toUsageRecordQuery(query);
+    request.log.info({ usageQuery, raw: request.query }, "debug usage query");
     const page = await app.usageRecorder.pageRecent(usageQuery);
 
     return {
