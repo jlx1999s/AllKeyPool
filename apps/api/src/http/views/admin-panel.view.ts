@@ -78,6 +78,16 @@ ${ADMIN_PANEL_CSS}
             <span data-i18n="nav.usage">Usage</span>
             <span class="badge" data-i18n="nav.usage.badge">Live</span>
           </div>
+          <div class="nav-item" data-route="events-requests">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+            <span data-i18n="nav.eventsRequests">Request events</span>
+            <span class="badge" data-events-requests-badge>0</span>
+          </div>
+          <div class="nav-item" data-route="events-health">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span data-i18n="nav.eventsHealth">Health events</span>
+            <span class="badge" data-events-health-badge>0</span>
+          </div>
         </div>
 
         <div class="nav-section">
@@ -121,6 +131,21 @@ ${ADMIN_PANEL_CSS}
               <div class="stat-label" data-i18n="ov.stat.keys">Keys</div>
               <div class="stat-value" id="ov-keys">—</div>
               <div class="stat-foot"><span id="ov-keys-active">0</span> <span data-i18n="ov.col.success">active</span> · <span id="ov-keys-disabled">0</span> <span data-i18n="ov.col.failed">disabled</span></div>
+            </div>
+            <div class="stat" style="cursor: pointer;" data-go="events-requests" data-go-query="outcome=error" data-go-range="24h">
+              <div class="stat-label" data-i18n="ov.stat.recentErrors">Recent errors (24h)</div>
+              <div class="stat-value" id="ov-recent-errors" style="color: var(--danger);">—</div>
+              <div class="stat-foot" data-i18n="ov.stat.recentErrorsFoot">Click to view error events →</div>
+            </div>
+            <div class="stat" style="cursor: pointer;" data-go="events-health" data-go-type="key_degraded">
+              <div class="stat-label" data-i18n="ov.stat.degraded">Degraded keys</div>
+              <div class="stat-value" id="ov-degraded-keys" style="color: var(--warn);">—</div>
+              <div class="stat-foot" data-i18n="ov.stat.degradedFoot">Click to view →</div>
+            </div>
+            <div class="stat" style="cursor: pointer;" data-go="events-health" data-go-type="key_cooling_down">
+              <div class="stat-label" data-i18n="ov.stat.coolingDown">Cooling down</div>
+              <div class="stat-value" id="ov-cooling-down" style="color: var(--danger);">—</div>
+              <div class="stat-foot" data-i18n="ov.stat.coolingDownFoot">Click to view →</div>
             </div>
             <div class="stat">
               <div class="stat-label" data-i18n="ov.stat.fake">Fake mode</div>
@@ -368,28 +393,43 @@ ${ADMIN_PANEL_CSS}
             </div>
           </div>
 
+        <section class="page" data-page="events-requests">
+          <div class="page-head">
+            <div>
+              <h1 data-i18n="page.eventsRequests.title">Request events</h1>
+              <p data-i18n="page.eventsRequests.desc">Per-request records: time, key, provider, model, status, latency.</p>
+            </div>
+            <div class="actions">
+              <button class="btn btn-secondary" id="requests-refresh-btn" data-i18n="events.refresh">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="stat-grid" id="requests-stats"></div>
           <div class="panel">
-            <div class="panel-head">
-              <div>
-                <h2 data-i18n="usage.events.title">Recent request events</h2>
-                <p class="muted" style="margin: 4px 0 0; font-size: 13px;" data-i18n="usage.events.desc">Filter raw usage records by key, provider, or outcome.</p>
+            <div class="panel-head"><h2 data-i18n="events.toolbar">Filters</h2></div>
+            <div class="panel-body">
+              <div class="row" style="gap: 6px; flex-wrap: wrap;">
+                <div class="seg" id="requests-time-seg" role="group" aria-label="Time range">
+                  <button class="seg-btn" data-range="1h" data-i18n="events.range.1h">1h</button>
+                  <button class="seg-btn" data-range="24h" data-i18n="events.range.24h">24h</button>
+                  <button class="seg-btn active" data-range="all" data-i18n="events.range.all">All</button>
+                </div>
+                <div class="seg" id="requests-outcome-seg" role="group" aria-label="Outcome">
+                  <button class="seg-btn active" data-outcome="" data-i18n="events.outcome.all">All</button>
+                  <button class="seg-btn" data-outcome="success" data-i18n="events.outcome.success">Success</button>
+                  <button class="seg-btn" data-outcome="error" data-i18n="events.outcome.error">Error</button>
+                </div>
+                <select class="filter-select" id="requests-provider-filter">
+                  <option value="" data-i18n="events.filter.allProvider">All providers</option>
+                </select>
+                <div class="search" style="max-width: 280px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                  <input id="requests-key-filter" data-i18n-placeholder="events.filter.keyPlaceholder" placeholder="Filter key id…">
+                </div>
               </div>
+              <div class="muted" id="requests-summary" style="font-size: 12px; margin-top: 10px;"></div>
             </div>
-            <div class="table-toolbar">
-              <select class="filter-select" id="usage-event-outcome-filter">
-                <option value="" data-i18n="usage.filter.allOutcome">All outcomes</option>
-                <option value="success">success</option>
-                <option value="error">error</option>
-              </select>
-              <select class="filter-select" id="usage-event-provider-filter">
-                <option value="" data-i18n="usage.filter.allProvider">All providers</option>
-              </select>
-              <div class="search">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-                <input id="usage-event-key-filter" data-i18n-placeholder="usage.filter.keyPlaceholder" placeholder="Filter key id…">
-              </div>
-            </div>
-            <div class="muted" id="usage-events-summary" style="font-size: 12px; margin: -4px 0 10px;"></div>
+          </div>
+          <div class="panel">
             <div class="table-wrap">
               <table class="data">
                 <thead>
@@ -402,44 +442,60 @@ ${ADMIN_PANEL_CSS}
                     <th class="num" data-i18n="usage.col.latency">Latency</th>
                   </tr>
                 </thead>
-                <tbody id="usage-events-body"></tbody>
+                <tbody id="requests-body"></tbody>
               </table>
             </div>
-            <div class="row" style="justify-content: flex-end; margin-top: 10px;">
-              <button class="btn btn-secondary btn-sm hidden" id="usage-events-more" data-i18n="events.loadMore">Load more</button>
+            <div class="row" style="justify-content: flex-end; margin: 10px 16px;">
+              <button class="btn btn-secondary btn-sm hidden" id="requests-more" data-i18n="events.loadMore">Load more</button>
             </div>
           </div>
+        </section>
 
+        <section class="page" data-page="events-health">
+          <div class="page-head">
+            <div>
+              <h1 data-i18n="page.eventsHealth.title">Health events</h1>
+              <p data-i18n="page.eventsHealth.desc">Provider attempts, key state transitions, and cooldown events.</p>
+            </div>
+            <div class="actions">
+              <button class="btn btn-secondary" id="health-refresh-btn" data-i18n="events.refresh">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="stat-grid" id="health-stats"></div>
           <div class="panel">
-            <div class="panel-head">
-              <div>
-                <h2 data-i18n="usage.health.title">Health events</h2>
-                <p class="muted" style="margin: 4px 0 0; font-size: 13px;" data-i18n="usage.health.desc">Provider and key health transitions.</p>
+            <div class="panel-head"><h2 data-i18n="events.toolbar">Filters</h2></div>
+            <div class="panel-body">
+              <div class="row" style="gap: 6px; flex-wrap: wrap;">
+                <div class="seg" id="health-time-seg" role="group" aria-label="Time range">
+                  <button class="seg-btn" data-range="1h" data-i18n="events.range.1h">1h</button>
+                  <button class="seg-btn" data-range="24h" data-i18n="events.range.24h">24h</button>
+                  <button class="seg-btn active" data-range="all" data-i18n="events.range.all">All</button>
+                </div>
+                <div class="seg" id="health-level-seg" role="group" aria-label="Level">
+                  <button class="seg-btn active" data-level="" data-i18n="events.level.all">All</button>
+                  <button class="seg-btn" data-level="info" data-i18n="events.level.info">Info</button>
+                  <button class="seg-btn" data-level="warn" data-i18n="events.level.warn">Warn</button>
+                  <button class="seg-btn" data-level="error" data-i18n="events.level.error">Error</button>
+                </div>
+                <select class="filter-select" id="health-type-filter">
+                  <option value="" data-i18n="events.filter.allType">All event types</option>
+                  <option value="provider_attempt_succeeded">provider_attempt_succeeded</option>
+                  <option value="provider_attempt_failed">provider_attempt_failed</option>
+                  <option value="key_exhausted">key_exhausted</option>
+                  <option value="key_degraded">key_degraded</option>
+                  <option value="key_cooling_down">key_cooling_down</option>
+                  <option value="key_recovered">key_recovered</option>
+                  <option value="key_status_changed">key_status_changed</option>
+                </select>
+                <div class="search" style="max-width: 280px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                  <input id="health-key-filter" data-i18n-placeholder="events.filter.keyPlaceholder" placeholder="Filter key id…">
+                </div>
               </div>
+              <div class="muted" id="health-summary" style="font-size: 12px; margin-top: 10px;"></div>
             </div>
-            <div class="table-toolbar">
-              <select class="filter-select" id="health-event-type-filter">
-                <option value="" data-i18n="usage.filter.allType">All event types</option>
-                <option value="provider_attempt_succeeded">provider_attempt_succeeded</option>
-                <option value="provider_attempt_failed">provider_attempt_failed</option>
-                <option value="key_exhausted">key_exhausted</option>
-                <option value="key_degraded">key_degraded</option>
-                <option value="key_cooling_down">key_cooling_down</option>
-                <option value="key_recovered">key_recovered</option>
-                <option value="key_status_changed">key_status_changed</option>
-              </select>
-              <select class="filter-select" id="health-event-level-filter">
-                <option value="" data-i18n="usage.filter.allLevel">All levels</option>
-                <option value="info">info</option>
-                <option value="warn">warn</option>
-                <option value="error">error</option>
-              </select>
-              <div class="search">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-                <input id="health-event-key-filter" data-i18n-placeholder="usage.filter.keyPlaceholder" placeholder="Filter key id…">
-              </div>
-            </div>
-            <div class="muted" id="health-events-summary" style="font-size: 12px; margin: -4px 0 10px;"></div>
+          </div>
+          <div class="panel">
             <div class="table-wrap">
               <table class="data">
                 <thead>
@@ -452,11 +508,11 @@ ${ADMIN_PANEL_CSS}
                     <th data-i18n="usage.col.message">Message</th>
                   </tr>
                 </thead>
-                <tbody id="health-events-body"></tbody>
+                <tbody id="health-body"></tbody>
               </table>
             </div>
-            <div class="row" style="justify-content: flex-end; margin-top: 10px;">
-              <button class="btn btn-secondary btn-sm hidden" id="health-events-more" data-i18n="events.loadMore">Load more</button>
+            <div class="row" style="justify-content: flex-end; margin: 10px 16px;">
+              <button class="btn btn-secondary btn-sm hidden" id="health-more" data-i18n="events.loadMore">Load more</button>
             </div>
           </div>
         </section>

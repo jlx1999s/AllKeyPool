@@ -215,6 +215,29 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await registerHealthRoutes(app);
   await registerProxyRoutes(app);
 
+  // Fallback: any unmatched GET to a non-API path redirects to /admin so
+  // users who paste a typo'd URL still land on the console with the auth
+  // overlay. API routes keep their 404 JSON response.
+  app.setNotFoundHandler((request, reply) => {
+    const url = request.url.split("?")[0] || "";
+    const accepts = request.headers.accept || "";
+    const isApiPath = url.startsWith("/admin/api/")
+      || url.startsWith("/_demo/")
+      || url.startsWith("/v1/");
+
+    if ((request.method === "GET" || request.method === "HEAD") && !isApiPath) {
+      if (accepts.includes("text/html") || accepts === "" || accepts.includes("*/*")) {
+        return reply.redirect("/admin");
+      }
+    }
+    return reply.status(404).send({
+      error: {
+        code: "not_found",
+        message: `Route not found: ${request.method} ${request.url}`
+      }
+    });
+  });
+
   return app;
 }
 

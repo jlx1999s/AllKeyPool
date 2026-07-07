@@ -1,10 +1,12 @@
 import type { I18nDictionary } from "./admin-panel.i18n.js";
 import { renderAdminPanelDemoScript } from "./admin-panel.demo-script.js";
+import { renderAdminPanelHealthScript } from "./admin-panel.health-script.js";
 import { renderAdminPanelKeysScript } from "./admin-panel.keys-script.js";
+import { renderAdminPanelRequestsScript } from "./admin-panel.requests-script.js";
 import { renderAdminPanelUsageScript } from "./admin-panel.usage-script.js";
 
 export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): string {
-  return String.raw`    const I18N = ${JSON.stringify(i18n)};
+  return `    const I18N = ${JSON.stringify(i18n)};
     const LANG_KEY = "keypool.lang";
     const TOKEN_KEY = "keypool.adminToken";
 
@@ -149,7 +151,7 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
     function go(route) { window.location.hash = "#/" + route; }
     function currentRouteSafe() {
       const h = window.location.hash || "#/overview";
-      return h.replace(/^#[/]?/, "") || "overview";
+      return h.replace(/^#[/]?/, "").split("?")[0] || "overview";
     }
     function renderRoute() {
       const r = currentRouteSafe();
@@ -162,6 +164,8 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
       if (r === "usage") refreshUsage();
       if (r === "settings") refreshAuditLogs();
       if (r === "overview") renderOverview();
+      if (r === "events-requests") refreshRequests();
+      if (r === "events-health") refreshHealth();
     }
     window.addEventListener("hashchange", renderRoute);
     document.querySelectorAll(".nav-item[data-route]").forEach((el) => {
@@ -228,13 +232,6 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
         .join("");
       if (s.providers.includes(prevProv)) provFilter.value = prevProv;
 
-      const usageProviderFilter = $("usage-event-provider-filter");
-      const prevUsageProvider = usageProviderFilter.value;
-      usageProviderFilter.innerHTML = ['<option value="">' + t("usage.filter.allProvider") + '</option>']
-        .concat(s.providers.map((p) => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>'))
-        .join("");
-      if (s.providers.includes(prevUsageProvider)) usageProviderFilter.value = prevUsageProvider;
-
       // demo model options
       const models = new Set();
       for (const pool of s.pools || []) {
@@ -283,6 +280,14 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
       $("ov-keys-active").textContent = active;
       $("ov-keys-disabled").textContent = disabled;
 
+      // Health stat cards (recent errors / degraded / cooling down).
+      const recentErrors = (state.usageEvents || []).filter((u) => u.outcome === "error").length;
+      $("ov-recent-errors").textContent = recentErrors;
+      const degraded = state.keys.filter((k) => k.status === "degraded").length;
+      $("ov-degraded-keys").textContent = degraded;
+      const coolingDown = state.keys.filter((k) => k.status === "cooling_down").length;
+      $("ov-cooling-down").textContent = coolingDown;
+
       const tbody = $("ov-activity");
       if (state.keys.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><h3>' + escapeHtml(t("ov.empty.title")) + '</h3><p>' + escapeHtml(t("ov.empty.desc")) + '</p></div></td></tr>';
@@ -308,6 +313,29 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
     }
     $("overview-refresh-btn").addEventListener("click", refreshState);
     $("overview-go-demo").addEventListener("click", () => go("demo"));
+
+    // Health stat cards: click to jump to the corresponding events page with
+    // pre-set filters (encoded as URL hash query params).
+    document.querySelectorAll(".stat[data-go]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const route = el.getAttribute("data-go") || "";
+        const params = new URLSearchParams();
+        const type = el.getAttribute("data-go-type");
+        if (type) params.set("type", type);
+        const outcome = el.getAttribute("data-go-query");
+        if (outcome) params.set("outcome", outcome);
+        const range = el.getAttribute("data-go-range");
+        if (range) params.set("range", range);
+        const qs = params.toString();
+        window.location.hash = "#/" + route + (qs ? "?" + qs : "");
+      });
+    });
+
+    function isWithin24h(d) {
+      if (!d) return false;
+      const ts = d instanceof Date ? d.getTime() : new Date(d).getTime();
+      return Date.now() - ts <= 24 * 60 * 60 * 1000;
+    }
 
 ${renderAdminPanelKeysScript()}
 
@@ -419,6 +447,10 @@ ${renderAdminPanelKeysScript()}
         + '</div>';
     }
 ${renderAdminPanelUsageScript()}
+
+${renderAdminPanelRequestsScript()}
+
+${renderAdminPanelHealthScript()}
 
 ${renderAdminPanelDemoScript()}
 

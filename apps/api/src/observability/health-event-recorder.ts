@@ -32,6 +32,7 @@ export interface HealthEventQuery extends PageQuery {
   provider?: string;
   keyId?: string;
   code?: string;
+  since?: Date;
 }
 
 export interface HealthEventStats {
@@ -114,5 +115,6 @@ function matchesHealthEventQuery(event: HealthEvent, query: HealthEventQuery): b
   if (query.provider !== undefined && event.provider !== query.provider) return false;
   if (query.keyId !== undefined && event.keyId !== query.keyId) return false;
   if (query.code !== undefined && event.code !== query.code) return false;
+  if (query.since !== undefined && event.createdAt < query.since) return false;
   return true;
 }

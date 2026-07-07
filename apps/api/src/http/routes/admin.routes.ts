@@ -59,7 +59,8 @@ const usageQuerySchema = z.object({
   provider: z.string().min(1).optional(),
   keyId: z.string().min(1).optional(),
   outcome: z.enum(["success", "error"]).optional(),
-  errorCode: z.string().min(1).optional()
+  errorCode: z.string().min(1).optional(),
+  since: z.coerce.date().optional()
 });
 
 const healthEventsQuerySchema = z.object({
@@ -78,7 +79,8 @@ const healthEventsQuerySchema = z.object({
   requestId: z.string().min(1).optional(),
   provider: z.string().min(1).optional(),
   keyId: z.string().min(1).optional(),
-  code: z.string().min(1).optional()
+  code: z.string().min(1).optional(),
+  since: z.coerce.date().optional()
 });
 
 type UsageQueryRequest = z.infer<typeof usageQuerySchema>;
@@ -478,6 +480,7 @@ function toUsageRecordQuery(input: UsageQueryRequest): UsageRecordQuery {
   if (input.keyId !== undefined) query.keyId = input.keyId;
   if (input.outcome !== undefined) query.outcome = input.outcome;
   if (input.errorCode !== undefined) query.errorCode = input.errorCode;
+  if (input.since !== undefined) query.since = input.since;
 
   return query;
 }
@@ -494,6 +497,7 @@ function toHealthEventQuery(input: HealthEventsQueryRequest): HealthEventQuery {
   if (input.provider !== undefined) query.provider = input.provider;
   if (input.keyId !== undefined) query.keyId = input.keyId;
   if (input.code !== undefined) query.code = input.code;
+  if (input.since !== undefined) query.since = input.since;
 
   return query;
 }

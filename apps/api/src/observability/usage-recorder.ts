@@ -25,6 +25,7 @@ export interface UsageRecordQuery extends PageQuery {
   keyId?: string;
   outcome?: UsageOutcome;
   errorCode?: string;
+  since?: Date;
 }
 
 export interface UsageRecordStats {
@@ -102,5 +103,6 @@ function matchesUsageRecordQuery(record: UsageRecord, query: UsageRecordQuery): 
   if (query.keyId !== undefined && record.keyId !== query.keyId) return false;
   if (query.outcome !== undefined && record.outcome !== query.outcome) return false;
   if (query.errorCode !== undefined && record.errorCode !== query.errorCode) return false;
+  if (query.since !== undefined && record.createdAt < query.since) return false;
   return true;
 }

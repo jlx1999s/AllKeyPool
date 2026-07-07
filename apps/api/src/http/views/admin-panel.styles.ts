@@ -96,6 +96,30 @@ export const ADMIN_PANEL_CSS = String.raw`    :root {
       box-shadow: var(--shadow-sm);
     }
 
+    .seg {
+      display: inline-flex; align-items: center;
+      background: var(--bg-subtle);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .seg-btn {
+      padding: 3px 10px;
+      border: none; background: transparent;
+      color: var(--text-muted);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+    }
+    .seg-btn:hover { color: var(--text); }
+    .seg-btn.active {
+      background: var(--bg-panel);
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+
     .shell { display: grid; grid-template-columns: 240px 1fr; }
     @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } }
 
