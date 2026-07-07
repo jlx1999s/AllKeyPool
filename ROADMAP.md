@@ -82,6 +82,7 @@ KeyPool's path from a single-process TS monorepo MVP to a production-grade AI ke
 - ✅ Admin panel template split into i18n / styles / script / HTML modules
 - ✅ Demo Runner client script split from main admin script
 - ✅ Usage page client script split from main admin script
+- ✅ Keys and Add Key drawer client script split from main admin script
 
 ## v0.2.8 — i18n
 - ✅ EN + zh-CN dictionaries, ~150 translation keys
