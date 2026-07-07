@@ -28,6 +28,7 @@ export function renderAdminPanelHealthScript(): string {
     async function refreshHealth() {
       try {
         const data = await requestJson("/admin/api/health-events" + buildHealthQueryString());
+        console.log("[demo.health] data:", JSON.stringify({items: (data.events || []).length, hasStats: !!data.stats}));
         healthState.items = data.events || [];
         healthState.page = data.page || null;
         healthState.stats = data.stats || null;
@@ -35,6 +36,7 @@ export function renderAdminPanelHealthScript(): string {
         renderHealthTable();
         renderHealthSummary();
       } catch (err) {
+        console.error("[demo.health] ERROR:", err);
         toast(t("usage.err.load", { msg: err.message }), "danger");
       }
     }
