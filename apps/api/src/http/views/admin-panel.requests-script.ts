@@ -67,9 +67,12 @@ export function renderAdminPanelRequestsScript(): string {
     function renderRequestsSummary() {
       const el = $("requests-summary");
       if (!el) return;
+      const stats = requestsState.stats || { total: 0, success: 0, error: 0, avgLatencyMs: 0 };
       el.textContent = t("usage.events.summary", {
-        total: requestsState.items.length,
-        more: requestsState.page && requestsState.page.hasMore ? 1 : 0
+        total: stats.total || requestsState.items.length,
+        success: stats.success || 0,
+        error: stats.error || 0,
+        avg: stats.avgLatencyMs || 0
       });
       const more = $("requests-more");
       if (more) more.classList.toggle("hidden", !(requestsState.page && requestsState.page.hasMore));

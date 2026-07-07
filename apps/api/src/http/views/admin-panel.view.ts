@@ -517,8 +517,6 @@ ${ADMIN_PANEL_CSS}
           </div>
         </section>
 
-        </section>
-
         <section class="page" data-page="settings">
           <div class="page-head">
             <div>

@@ -151,7 +151,7 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
     function go(route) { window.location.hash = "#/" + route; }
     function currentRouteSafe() {
       const h = window.location.hash || "#/overview";
-      return h.replace(/^#[/]?/, "") || "overview";
+      return h.replace(/^#[/]?/, "").split("?")[0] || "overview";
     }
     function renderRoute() {
       const r = currentRouteSafe();
@@ -161,7 +161,6 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
       document.querySelectorAll(".page[data-page]").forEach((el) => {
         el.classList.toggle("active", el.dataset.page === r);
       });
-      console.log("[renderRoute] r=" + r + " active page:", document.querySelector(".page.active") && document.querySelector(".page.active").dataset.page);
       if (r === "usage") refreshUsage();
       if (r === "settings") refreshAuditLogs();
       if (r === "overview") renderOverview();

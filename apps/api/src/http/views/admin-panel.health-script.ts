@@ -67,9 +67,13 @@ export function renderAdminPanelHealthScript(): string {
     function renderHealthSummary() {
       const el = $("health-summary");
       if (!el) return;
-      el.textContent = t("health.summary", {
-        total: healthState.items.length,
-        more: healthState.page && healthState.page.hasMore ? 1 : 0
+      const stats = healthState.stats || { total: 0, byLevel: { info: 0, warn: 0, error: 0 } };
+      const byLevel = stats.byLevel || {};
+      el.textContent = t("usage.health.summary", {
+        total: stats.total || healthState.items.length,
+        info: byLevel.info || 0,
+        warn: byLevel.warn || 0,
+        error: byLevel.error || 0
       });
       const more = $("health-more");
       if (more) more.classList.toggle("hidden", !(healthState.page && healthState.page.hasMore));
