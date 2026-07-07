@@ -392,6 +392,7 @@ ${ADMIN_PANEL_CSS}
               </table>
             </div>
           </div>
+        </section>
 
         <section class="page" data-page="events-requests">
           <div class="page-head">

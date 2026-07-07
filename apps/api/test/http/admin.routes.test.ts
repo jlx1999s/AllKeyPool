@@ -41,6 +41,13 @@ describe("admin routes", () => {
     expect(adminResponse.body).toContain("requests-body");
     expect(adminResponse.body).toContain("health-body");
     expect(adminResponse.body).toContain("requests-provider-filter");
+    const usagePageStart = adminResponse.body.indexOf('<section class="page" data-page="usage">');
+    const requestEventsPageStart = adminResponse.body.indexOf('<section class="page" data-page="events-requests">');
+    const usagePageEnd = adminResponse.body.indexOf("</section>", usagePageStart);
+    expect(usagePageStart).toBeGreaterThan(-1);
+    expect(requestEventsPageStart).toBeGreaterThan(-1);
+    expect(usagePageEnd).toBeGreaterThan(-1);
+    expect(usagePageEnd).toBeLessThan(requestEventsPageStart);
     expect(devResponse.statusCode).toBe(302);
     expect(devResponse.headers.location).toBe("/admin");
 
