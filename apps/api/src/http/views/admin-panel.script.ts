@@ -164,6 +164,8 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
       if (r === "usage") refreshUsage();
       if (r === "settings") refreshAuditLogs();
       if (r === "overview") renderOverview();
+      if (r === "events-requests") refreshRequests();
+      if (r === "events-health") refreshHealth();
     }
     window.addEventListener("hashchange", renderRoute);
     document.querySelectorAll(".nav-item[data-route]").forEach((el) => {
