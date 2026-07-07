@@ -6,7 +6,7 @@ import { renderAdminPanelRequestsScript } from "./admin-panel.requests-script.js
 import { renderAdminPanelUsageScript } from "./admin-panel.usage-script.js";
 
 export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): string {
-  return String.raw`    const I18N = ${JSON.stringify(i18n)};
+  return `    const I18N = ${JSON.stringify(i18n)};
     const LANG_KEY = "keypool.lang";
     const TOKEN_KEY = "keypool.adminToken";
 
