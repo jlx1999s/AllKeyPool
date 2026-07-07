@@ -1,3 +1,5 @@
+import { offsetFromCursor, pageFromItems, type PageQuery, type PaginatedResult } from "./pagination.js";
+
 export type UsageOutcome = "success" | "error";
 
 export interface UsageRecord {
@@ -15,8 +17,7 @@ export interface UsageRecord {
   createdAt: Date;
 }
 
-export interface UsageRecordQuery {
-  limit?: number;
+export interface UsageRecordQuery extends PageQuery {
   route?: string;
   model?: string;
   pool?: string;
@@ -26,9 +27,18 @@ export interface UsageRecordQuery {
   errorCode?: string;
 }
 
+export interface UsageRecordStats {
+  total: number;
+  success: number;
+  error: number;
+  avgLatencyMs: number;
+}
+
 export interface UsageRecorder {
   record(record: Omit<UsageRecord, "id" | "createdAt">): Promise<UsageRecord>;
   listRecent(query?: UsageRecordQuery): Promise<UsageRecord[]>;
+  pageRecent(query?: UsageRecordQuery): Promise<PaginatedResult<UsageRecord>>;
+  getStats(query?: UsageRecordQuery): Promise<UsageRecordStats>;
 }
 
 export class InMemoryUsageRecorder implements UsageRecorder {
@@ -56,10 +66,31 @@ export class InMemoryUsageRecorder implements UsageRecorder {
   }
 
   async listRecent(query: UsageRecordQuery = {}): Promise<UsageRecord[]> {
+    const page = await this.pageRecent(query);
+    return page.items;
+  }
+
+  async pageRecent(query: UsageRecordQuery = {}): Promise<PaginatedResult<UsageRecord>> {
     const limit = query.limit ?? 50;
-    return this.records
+    const offset = offsetFromCursor(query.cursor);
+    const items = this.records
       .filter((record) => matchesUsageRecordQuery(record, query))
-      .slice(0, limit);
+      .slice(offset, offset + limit + 1);
+    return pageFromItems(items, limit, offset);
+  }
+
+  async getStats(query: UsageRecordQuery = {}): Promise<UsageRecordStats> {
+    const records = this.records.filter((record) => matchesUsageRecordQuery(record, query));
+    const success = records.filter((record) => record.outcome === "success").length;
+    const error = records.filter((record) => record.outcome === "error").length;
+    const totalLatency = records.reduce((sum, record) => sum + record.latencyMs, 0);
+
+    return {
+      total: records.length,
+      success,
+      error,
+      avgLatencyMs: records.length > 0 ? Math.round(totalLatency / records.length) : 0
+    };
   }
 }
 

@@ -169,7 +169,7 @@ curl 'http://localhost:3000/admin/api/usage?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
-Usage can be filtered by `route`, `model`, `pool`, `provider`, `keyId`, `outcome`, and `errorCode`. The Usage page exposes the common `outcome`, `provider`, and `keyId` filters directly in the admin console.
+Usage can be filtered by `route`, `model`, `pool`, `provider`, `keyId`, `outcome`, and `errorCode`. The response includes `usage`, `page`, and `stats`; pass `cursor=<page.nextCursor>` to fetch the next page. The Usage page exposes the common `outcome`, `provider`, and `keyId` filters, aggregate stats, and load-more pagination directly in the admin console.
 
 Recent health events API:
 
@@ -178,7 +178,7 @@ curl 'http://localhost:3000/admin/api/health-events?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
-Health events can be filtered by `type`, `level`, `requestId`, `provider`, `keyId`, and `code`. The Usage page exposes `type`, `level`, and `keyId` filters for quick incident triage.
+Health events can be filtered by `type`, `level`, `requestId`, `provider`, `keyId`, and `code`. The response includes `events`, `page`, and `stats`; pass `cursor=<page.nextCursor>` to fetch the next page. The Usage page exposes `type`, `level`, and `keyId` filters, aggregate stats, and load-more pagination for quick incident triage.
 
 Recent admin audit log API:
 
@@ -187,7 +187,7 @@ curl 'http://localhost:3000/admin/api/audit-logs?limit=20' \
   -H 'authorization: Bearer keypool-admin-dev'
 ```
 
-Audit logs can be filtered by `action`, `outcome`, `targetType`, `targetId`, `actorType`, and `actorId`:
+Audit logs can be filtered by `action`, `outcome`, `targetType`, `targetId`, `actorType`, and `actorId`. The response includes `auditLogs`, `page`, and `stats`; pass `cursor=<page.nextCursor>` to fetch the next page:
 
 ```bash
 curl 'http://localhost:3000/admin/api/audit-logs?action=key_status_changed&outcome=success&targetId=minimax-prod-1' \

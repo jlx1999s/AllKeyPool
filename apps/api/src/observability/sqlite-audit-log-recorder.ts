@@ -1,10 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
+import { offsetFromCursor, pageFromItems, type PaginatedResult } from "./pagination.js";
 import type {
   AuditAction,
   AuditActorType,
   AuditLog,
   AuditLogQuery,
   AuditLogRecorder,
+  AuditLogStats,
   AuditOutcome
 } from "./audit-log-recorder.js";
 
@@ -54,13 +56,48 @@ export class SqliteAuditLogRecorder implements AuditLogRecorder {
   }
 
   async listRecent(query: AuditLogQuery = {}): Promise<AuditLog[]> {
+    const page = await this.pageRecent(query);
+    return page.items;
+  }
+
+  async pageRecent(query: AuditLogQuery = {}): Promise<PaginatedResult<AuditLog>> {
     const limit = query.limit ?? 50;
+    const offset = offsetFromCursor(query.cursor);
     const filters = buildWhereClause(query);
 
-    return this.database
-      .prepare(`SELECT * FROM audit_logs ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ?`)
-      .all(...filters.params, limit)
+    const items = this.database
+      .prepare(`SELECT * FROM audit_logs ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`)
+      .all(...filters.params, limit + 1, offset)
       .map((row) => rowToAuditLog(row as unknown as AuditLogRow));
+
+    return pageFromItems(items, limit, offset);
+  }
+
+  async getStats(query: AuditLogQuery = {}): Promise<AuditLogStats> {
+    const filters = buildWhereClause(query);
+    const totalRow = this.database
+      .prepare(`SELECT COUNT(*) AS total FROM audit_logs ${filters.whereSql}`)
+      .get(...filters.params) as { total: number };
+    const outcomeRows = this.database
+      .prepare(`SELECT outcome, COUNT(*) AS count FROM audit_logs ${filters.whereSql} GROUP BY outcome`)
+      .all(...filters.params) as Array<{ outcome: AuditOutcome; count: number }>;
+    const actionRows = this.database
+      .prepare(`SELECT action, COUNT(*) AS count FROM audit_logs ${filters.whereSql} GROUP BY action`)
+      .all(...filters.params) as Array<{ action: AuditAction; count: number }>;
+    const byOutcome: Record<AuditOutcome, number> = {
+      success: 0,
+      error: 0
+    };
+    const byAction: Partial<Record<AuditAction, number>> = {};
+
+    for (const row of outcomeRows) byOutcome[row.outcome] = row.count;
+    for (const row of actionRows) byAction[row.action] = row.count;
+
+    return {
+      total: totalRow.total,
+      byOutcome,
+      byAction
+    };
   }
 }
 

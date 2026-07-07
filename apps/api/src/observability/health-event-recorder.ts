@@ -1,3 +1,5 @@
+import { offsetFromCursor, pageFromItems, type PageQuery, type PaginatedResult } from "./pagination.js";
+
 export type HealthEventLevel = "info" | "warn" | "error";
 
 export type HealthEventType =
@@ -23,8 +25,7 @@ export interface HealthEvent {
   createdAt: Date;
 }
 
-export interface HealthEventQuery {
-  limit?: number;
+export interface HealthEventQuery extends PageQuery {
   type?: HealthEventType;
   level?: HealthEventLevel;
   requestId?: string;
@@ -33,9 +34,17 @@ export interface HealthEventQuery {
   code?: string;
 }
 
+export interface HealthEventStats {
+  total: number;
+  byLevel: Record<HealthEventLevel, number>;
+  byType: Partial<Record<HealthEventType, number>>;
+}
+
 export interface HealthEventRecorder {
   record(event: Omit<HealthEvent, "id" | "createdAt">): Promise<HealthEvent>;
   listRecent(query?: HealthEventQuery): Promise<HealthEvent[]>;
+  pageRecent(query?: HealthEventQuery): Promise<PaginatedResult<HealthEvent>>;
+  getStats(query?: HealthEventQuery): Promise<HealthEventStats>;
 }
 
 export class InMemoryHealthEventRecorder implements HealthEventRecorder {
@@ -63,10 +72,38 @@ export class InMemoryHealthEventRecorder implements HealthEventRecorder {
   }
 
   async listRecent(query: HealthEventQuery = {}): Promise<HealthEvent[]> {
+    const page = await this.pageRecent(query);
+    return page.items;
+  }
+
+  async pageRecent(query: HealthEventQuery = {}): Promise<PaginatedResult<HealthEvent>> {
     const limit = query.limit ?? 50;
-    return this.events
+    const offset = offsetFromCursor(query.cursor);
+    const items = this.events
       .filter((event) => matchesHealthEventQuery(event, query))
-      .slice(0, limit);
+      .slice(offset, offset + limit + 1);
+    return pageFromItems(items, limit, offset);
+  }
+
+  async getStats(query: HealthEventQuery = {}): Promise<HealthEventStats> {
+    const events = this.events.filter((event) => matchesHealthEventQuery(event, query));
+    const byLevel: Record<HealthEventLevel, number> = {
+      info: 0,
+      warn: 0,
+      error: 0
+    };
+    const byType: Partial<Record<HealthEventType, number>> = {};
+
+    for (const event of events) {
+      byLevel[event.level] += 1;
+      byType[event.type] = (byType[event.type] ?? 0) + 1;
+    }
+
+    return {
+      total: events.length,
+      byLevel,
+      byType
+    };
   }
 }
 

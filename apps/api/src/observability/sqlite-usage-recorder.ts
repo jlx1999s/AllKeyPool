@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { UsageOutcome, UsageRecord, UsageRecordQuery, UsageRecorder } from "./usage-recorder.js";
+import { offsetFromCursor, pageFromItems, type PaginatedResult } from "./pagination.js";
+import type { UsageOutcome, UsageRecord, UsageRecordQuery, UsageRecorder, UsageRecordStats } from "./usage-recorder.js";
 
 interface UsageRecordRow {
   id: string;
@@ -51,13 +52,48 @@ export class SqliteUsageRecorder implements UsageRecorder {
   }
 
   async listRecent(query: UsageRecordQuery = {}): Promise<UsageRecord[]> {
+    const page = await this.pageRecent(query);
+    return page.items;
+  }
+
+  async pageRecent(query: UsageRecordQuery = {}): Promise<PaginatedResult<UsageRecord>> {
     const limit = query.limit ?? 50;
+    const offset = offsetFromCursor(query.cursor);
     const filters = buildWhereClause(query);
 
-    return this.database
-      .prepare(`SELECT * FROM usage_records ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ?`)
-      .all(...filters.params, limit)
+    const items = this.database
+      .prepare(`SELECT * FROM usage_records ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`)
+      .all(...filters.params, limit + 1, offset)
       .map((row) => rowToUsageRecord(row as unknown as UsageRecordRow));
+
+    return pageFromItems(items, limit, offset);
+  }
+
+  async getStats(query: UsageRecordQuery = {}): Promise<UsageRecordStats> {
+    const filters = buildWhereClause(query);
+    const row = this.database
+      .prepare(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END) AS success,
+          SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END) AS error,
+          COALESCE(ROUND(AVG(latency_ms)), 0) AS avg_latency_ms
+        FROM usage_records
+        ${filters.whereSql}
+      `)
+      .get(...filters.params) as {
+        total: number;
+        success: number | null;
+        error: number | null;
+        avg_latency_ms: number;
+      };
+
+    return {
+      total: row.total,
+      success: row.success ?? 0,
+      error: row.error ?? 0,
+      avgLatencyMs: row.avg_latency_ms
+    };
   }
 }
 

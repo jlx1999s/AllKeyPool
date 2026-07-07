@@ -6,7 +6,11 @@ export function renderAdminPanelUsageScript(): string {
         const healthData = await requestJson("/admin/api/health-events" + buildHealthEventQueryString());
         state.keys = data.keys;
         state.usageEvents = usageData.usage || [];
+        state.usageEventPage = usageData.page || null;
+        state.usageEventStats = usageData.stats || null;
         state.healthEvents = healthData.events || [];
+        state.healthEventPage = healthData.page || null;
+        state.healthEventStats = healthData.stats || null;
         const stats = $("usage-stats");
         const totalReq = state.keys.reduce((a, k) => a + ((k.usage && k.usage.total) || 0), 0);
         const totalSucc = state.keys.reduce((a, k) => a + ((k.usage && k.usage.success) || 0), 0);
@@ -47,24 +51,52 @@ export function renderAdminPanelUsageScript(): string {
       }
     }
 
-    function buildUsageEventQueryString() {
+    async function loadMoreUsageEvents() {
+      if (!(state.usageEventPage && state.usageEventPage.nextCursor)) return;
+      try {
+        const data = await requestJson("/admin/api/usage" + buildUsageEventQueryString(state.usageEventPage.nextCursor));
+        state.usageEvents = state.usageEvents.concat(data.usage || []);
+        state.usageEventPage = data.page || null;
+        state.usageEventStats = data.stats || state.usageEventStats;
+        renderUsageEvents();
+      } catch (err) {
+        toast(t("usage.err.load", { msg: err.message }), "danger");
+      }
+    }
+
+    async function loadMoreHealthEvents() {
+      if (!(state.healthEventPage && state.healthEventPage.nextCursor)) return;
+      try {
+        const data = await requestJson("/admin/api/health-events" + buildHealthEventQueryString(state.healthEventPage.nextCursor));
+        state.healthEvents = state.healthEvents.concat(data.events || []);
+        state.healthEventPage = data.page || null;
+        state.healthEventStats = data.stats || state.healthEventStats;
+        renderHealthEvents();
+      } catch (err) {
+        toast(t("usage.err.load", { msg: err.message }), "danger");
+      }
+    }
+
+    function buildUsageEventQueryString(cursor) {
       const params = new URLSearchParams();
       params.set("limit", "50");
       const outcome = $("usage-event-outcome-filter").value;
       const provider = $("usage-event-provider-filter").value;
       const keyId = $("usage-event-key-filter").value.trim();
+      if (cursor) params.set("cursor", cursor);
       if (outcome) params.set("outcome", outcome);
       if (provider) params.set("provider", provider);
       if (keyId) params.set("keyId", keyId);
       return "?" + params.toString();
     }
 
-    function buildHealthEventQueryString() {
+    function buildHealthEventQueryString(cursor) {
       const params = new URLSearchParams();
       params.set("limit", "50");
       const type = $("health-event-type-filter").value;
       const level = $("health-event-level-filter").value;
       const keyId = $("health-event-key-filter").value.trim();
+      if (cursor) params.set("cursor", cursor);
       if (type) params.set("type", type);
       if (level) params.set("level", level);
       if (keyId) params.set("keyId", keyId);
@@ -74,6 +106,20 @@ export function renderAdminPanelUsageScript(): string {
     function renderUsageEvents() {
       const tbody = $("usage-events-body");
       if (!tbody) return;
+      const summary = $("usage-events-summary");
+      const more = $("usage-events-more");
+      if (summary) {
+        const stats = state.usageEventStats || { total: 0, success: 0, error: 0, avgLatencyMs: 0 };
+        summary.textContent = t("usage.events.summary", {
+          total: stats.total,
+          success: stats.success,
+          error: stats.error,
+          avg: stats.avgLatencyMs
+        });
+      }
+      if (more) {
+        more.classList.toggle("hidden", !(state.usageEventPage && state.usageEventPage.hasMore));
+      }
       if (state.usageEvents.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><h3>' + escapeHtml(t("usage.events.empty")) + '</h3></div></td></tr>';
         return;
@@ -94,6 +140,20 @@ export function renderAdminPanelUsageScript(): string {
     function renderHealthEvents() {
       const tbody = $("health-events-body");
       if (!tbody) return;
+      const summary = $("health-events-summary");
+      const more = $("health-events-more");
+      if (summary) {
+        const stats = state.healthEventStats || { total: 0, byLevel: { info: 0, warn: 0, error: 0 } };
+        summary.textContent = t("usage.health.summary", {
+          total: stats.total,
+          info: (stats.byLevel && stats.byLevel.info) || 0,
+          warn: (stats.byLevel && stats.byLevel.warn) || 0,
+          error: (stats.byLevel && stats.byLevel.error) || 0
+        });
+      }
+      if (more) {
+        more.classList.toggle("hidden", !(state.healthEventPage && state.healthEventPage.hasMore));
+      }
       if (state.healthEvents.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><h3>' + escapeHtml(t("usage.health.empty")) + '</h3></div></td></tr>';
         return;
@@ -116,6 +176,8 @@ export function renderAdminPanelUsageScript(): string {
     $("usage-event-provider-filter").addEventListener("change", refreshUsage);
     $("health-event-type-filter").addEventListener("change", refreshUsage);
     $("health-event-level-filter").addEventListener("change", refreshUsage);
+    $("usage-events-more").addEventListener("click", loadMoreUsageEvents);
+    $("health-events-more").addEventListener("click", loadMoreHealthEvents);
     $("usage-event-key-filter").addEventListener("keydown", (e) => {
       if (e.key === "Enter") refreshUsage();
     });

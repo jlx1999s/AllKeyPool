@@ -94,7 +94,24 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
       close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>'
     };
     const $ = (id) => document.getElementById(id);
-    const state = { keys: [], pools: [], providers: [], presets: [], auditLogs: [], usageEvents: [], healthEvents: [], fakeProvider: false, server: null, retry: null };
+    const state = {
+      keys: [],
+      pools: [],
+      providers: [],
+      presets: [],
+      auditLogs: [],
+      auditPage: null,
+      auditStats: null,
+      usageEvents: [],
+      usageEventPage: null,
+      usageEventStats: null,
+      healthEvents: [],
+      healthEventPage: null,
+      healthEventStats: null,
+      fakeProvider: false,
+      server: null,
+      retry: null
+    };
     function getToken() { return localStorage.getItem(TOKEN_KEY) || ""; }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
     function clearToken() { localStorage.removeItem(TOKEN_KEY); }
@@ -143,7 +160,7 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
         el.classList.toggle("active", el.dataset.page === r);
       });
       if (r === "usage") refreshUsage();
-      if (r === "settings") renderAuditLogs();
+      if (r === "settings") refreshAuditLogs();
       if (r === "overview") renderOverview();
     }
     window.addEventListener("hashchange", renderRoute);
@@ -177,8 +194,14 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
       state.providers = s.providers;
       state.presets = s.presets || [];
       state.auditLogs = s.auditLogs || [];
+      state.auditPage = null;
+      state.auditStats = null;
       state.usageEvents = s.usage || [];
+      state.usageEventPage = null;
+      state.usageEventStats = null;
       state.healthEvents = s.healthEvents || [];
+      state.healthEventPage = null;
+      state.healthEventStats = null;
       state.fakeProvider = s.fakeProvider;
       state.server = s.server;
       state.retry = s.retry;
@@ -318,23 +341,26 @@ ${renderAdminPanelKeysScript()}
     }
     function countKeysInPool(name) { return state.keys.filter((k) => k.pool === name).length; }
 
-    async function refreshAuditLogs() {
+    async function refreshAuditLogs(cursor) {
       try {
-        const query = buildAuditLogQueryString();
+        const query = buildAuditLogQueryString(cursor);
         const data = await requestJson("/admin/api/audit-logs" + query);
-        state.auditLogs = data.auditLogs || [];
+        state.auditLogs = cursor ? state.auditLogs.concat(data.auditLogs || []) : data.auditLogs || [];
+        state.auditPage = data.page || null;
+        state.auditStats = data.stats || null;
         renderAuditLogs();
       } catch (err) {
         toast(t("settings.audit.err.load", { msg: err.message }), "danger");
       }
     }
 
-    function buildAuditLogQueryString() {
+    function buildAuditLogQueryString(cursor) {
       const params = new URLSearchParams();
       params.set("limit", "50");
       const action = $("settings-audit-action-filter").value;
       const outcome = $("settings-audit-outcome-filter").value;
       const targetId = $("settings-audit-target-filter").value.trim();
+      if (cursor) params.set("cursor", cursor);
       if (action) params.set("action", action);
       if (outcome) params.set("outcome", outcome);
       if (targetId) params.set("targetId", targetId);
@@ -344,6 +370,19 @@ ${renderAdminPanelKeysScript()}
     function renderAuditLogs() {
       const tbody = $("settings-audit-body");
       if (!tbody) return;
+      const summary = $("settings-audit-summary");
+      const more = $("settings-audit-more");
+      if (summary) {
+        const stats = state.auditStats || { total: 0, byOutcome: { success: 0, error: 0 } };
+        summary.textContent = t("settings.audit.summary", {
+          total: stats.total,
+          success: (stats.byOutcome && stats.byOutcome.success) || 0,
+          error: (stats.byOutcome && stats.byOutcome.error) || 0
+        });
+      }
+      if (more) {
+        more.classList.toggle("hidden", !(state.auditPage && state.auditPage.hasMore));
+      }
       if (state.auditLogs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><h3>' + escapeHtml(t("settings.audit.empty")) + '</h3></div></td></tr>';
         return;
@@ -366,6 +405,9 @@ ${renderAdminPanelKeysScript()}
     $("settings-audit-outcome-filter").addEventListener("change", refreshAuditLogs);
     $("settings-audit-target-filter").addEventListener("keydown", (e) => {
       if (e.key === "Enter") refreshAuditLogs();
+    });
+    $("settings-audit-more").addEventListener("click", () => {
+      if (state.auditPage && state.auditPage.nextCursor) refreshAuditLogs(state.auditPage.nextCursor);
     });
 
     function stat(labelKey, value, footKey, accent) {

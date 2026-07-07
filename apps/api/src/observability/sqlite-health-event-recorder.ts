@@ -1,9 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
+import { offsetFromCursor, pageFromItems, type PaginatedResult } from "./pagination.js";
 import type {
   HealthEvent,
   HealthEventLevel,
   HealthEventQuery,
   HealthEventRecorder,
+  HealthEventStats,
   HealthEventType
 } from "./health-event-recorder.js";
 
@@ -55,13 +57,49 @@ export class SqliteHealthEventRecorder implements HealthEventRecorder {
   }
 
   async listRecent(query: HealthEventQuery = {}): Promise<HealthEvent[]> {
+    const page = await this.pageRecent(query);
+    return page.items;
+  }
+
+  async pageRecent(query: HealthEventQuery = {}): Promise<PaginatedResult<HealthEvent>> {
     const limit = query.limit ?? 50;
+    const offset = offsetFromCursor(query.cursor);
     const filters = buildWhereClause(query);
 
-    return this.database
-      .prepare(`SELECT * FROM health_events ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ?`)
-      .all(...filters.params, limit)
+    const items = this.database
+      .prepare(`SELECT * FROM health_events ${filters.whereSql} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`)
+      .all(...filters.params, limit + 1, offset)
       .map((row) => rowToHealthEvent(row as unknown as HealthEventRow));
+
+    return pageFromItems(items, limit, offset);
+  }
+
+  async getStats(query: HealthEventQuery = {}): Promise<HealthEventStats> {
+    const filters = buildWhereClause(query);
+    const totalRow = this.database
+      .prepare(`SELECT COUNT(*) AS total FROM health_events ${filters.whereSql}`)
+      .get(...filters.params) as { total: number };
+    const levelRows = this.database
+      .prepare(`SELECT level, COUNT(*) AS count FROM health_events ${filters.whereSql} GROUP BY level`)
+      .all(...filters.params) as Array<{ level: HealthEventLevel; count: number }>;
+    const typeRows = this.database
+      .prepare(`SELECT type, COUNT(*) AS count FROM health_events ${filters.whereSql} GROUP BY type`)
+      .all(...filters.params) as Array<{ type: HealthEventType; count: number }>;
+    const byLevel: Record<HealthEventLevel, number> = {
+      info: 0,
+      warn: 0,
+      error: 0
+    };
+    const byType: Partial<Record<HealthEventType, number>> = {};
+
+    for (const row of levelRows) byLevel[row.level] = row.count;
+    for (const row of typeRows) byType[row.type] = row.count;
+
+    return {
+      total: totalRow.total,
+      byLevel,
+      byType
+    };
   }
 }
 

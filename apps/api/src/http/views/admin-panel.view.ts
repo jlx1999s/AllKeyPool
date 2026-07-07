@@ -389,6 +389,7 @@ ${ADMIN_PANEL_CSS}
                 <input id="usage-event-key-filter" data-i18n-placeholder="usage.filter.keyPlaceholder" placeholder="Filter key id…">
               </div>
             </div>
+            <div class="muted" id="usage-events-summary" style="font-size: 12px; margin: -4px 0 10px;"></div>
             <div class="table-wrap">
               <table class="data">
                 <thead>
@@ -403,6 +404,9 @@ ${ADMIN_PANEL_CSS}
                 </thead>
                 <tbody id="usage-events-body"></tbody>
               </table>
+            </div>
+            <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+              <button class="btn btn-secondary btn-sm hidden" id="usage-events-more" data-i18n="events.loadMore">Load more</button>
             </div>
           </div>
 
@@ -435,6 +439,7 @@ ${ADMIN_PANEL_CSS}
                 <input id="health-event-key-filter" data-i18n-placeholder="usage.filter.keyPlaceholder" placeholder="Filter key id…">
               </div>
             </div>
+            <div class="muted" id="health-events-summary" style="font-size: 12px; margin: -4px 0 10px;"></div>
             <div class="table-wrap">
               <table class="data">
                 <thead>
@@ -449,6 +454,9 @@ ${ADMIN_PANEL_CSS}
                 </thead>
                 <tbody id="health-events-body"></tbody>
               </table>
+            </div>
+            <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+              <button class="btn btn-secondary btn-sm hidden" id="health-events-more" data-i18n="events.loadMore">Load more</button>
             </div>
           </div>
         </section>
@@ -531,6 +539,7 @@ ${ADMIN_PANEL_CSS}
                 <input id="settings-audit-target-filter" data-i18n-placeholder="settings.audit.filter.targetPlaceholder" placeholder="Filter target id…">
               </div>
             </div>
+            <div class="muted" id="settings-audit-summary" style="font-size: 12px; margin: -4px 0 10px;"></div>
             <div class="table-wrap">
               <table class="data">
                 <thead>
@@ -544,6 +553,9 @@ ${ADMIN_PANEL_CSS}
                 </thead>
                 <tbody id="settings-audit-body"></tbody>
               </table>
+            </div>
+            <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+              <button class="btn btn-secondary btn-sm hidden" id="settings-audit-more" data-i18n="events.loadMore">Load more</button>
             </div>
           </div>
         </section>

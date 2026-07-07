@@ -116,6 +116,17 @@ describe("POST /v1/chat/completions", () => {
         outcome: "success"
       })
     ]);
+    expect(usageResponse.json()).toMatchObject({
+      page: {
+        limit: 50,
+        hasMore: false
+      },
+      stats: {
+        total: 1,
+        success: 1,
+        error: 0
+      }
+    });
     const filteredUsageResponse = await app.inject({
       method: "GET",
       url: "/admin/api/usage?provider=openai&keyId=openai-key-1&outcome=success",
@@ -129,6 +140,11 @@ describe("POST /v1/chat/completions", () => {
         outcome: "success"
       })
     ]);
+    expect(filteredUsageResponse.json().stats).toMatchObject({
+      total: 1,
+      success: 1,
+      error: 0
+    });
 
     await app.close();
     vi.unstubAllGlobals();

@@ -52,6 +52,7 @@ const chatTestSchema = z.object({
 
 const usageQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(50),
+  cursor: z.string().min(1).optional(),
   route: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
   pool: z.string().min(1).optional(),
@@ -63,6 +64,7 @@ const usageQuerySchema = z.object({
 
 const healthEventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(50),
+  cursor: z.string().min(1).optional(),
   type: z.enum([
     "provider_attempt_succeeded",
     "provider_attempt_failed",
@@ -84,6 +86,7 @@ type HealthEventsQueryRequest = z.infer<typeof healthEventsQuerySchema>;
 
 const auditLogsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(50),
+  cursor: z.string().min(1).optional(),
   action: z.enum(["key_created", "key_updated", "key_status_changed", "key_deleted"]).optional(),
   actorType: z.enum(["admin", "system"]).optional(),
   actorId: z.string().min(1).optional(),
@@ -138,22 +141,37 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/admin/api/usage", async (request) => {
     const query = usageQuerySchema.parse(request.query);
+    const usageQuery = toUsageRecordQuery(query);
+    const page = await app.usageRecorder.pageRecent(usageQuery);
+
     return {
-      usage: await app.usageRecorder.listRecent(toUsageRecordQuery(query))
+      usage: page.items,
+      page: page.page,
+      stats: await app.usageRecorder.getStats(usageQuery)
     };
   });
 
   app.get("/admin/api/health-events", async (request) => {
     const query = healthEventsQuerySchema.parse(request.query);
+    const healthEventQuery = toHealthEventQuery(query);
+    const page = await app.healthEventRecorder.pageRecent(healthEventQuery);
+
     return {
-      events: await app.healthEventRecorder.listRecent(toHealthEventQuery(query))
+      events: page.items,
+      page: page.page,
+      stats: await app.healthEventRecorder.getStats(healthEventQuery)
     };
   });
 
   app.get("/admin/api/audit-logs", async (request) => {
     const query = auditLogsQuerySchema.parse(request.query);
+    const auditLogQuery = toAuditLogQuery(query);
+    const page = await app.auditLogRecorder.pageRecent(auditLogQuery);
+
     return {
-      auditLogs: await app.auditLogRecorder.listRecent(toAuditLogQuery(query))
+      auditLogs: page.items,
+      page: page.page,
+      stats: await app.auditLogRecorder.getStats(auditLogQuery)
     };
   });
 
@@ -452,6 +470,7 @@ function toUsageRecordQuery(input: UsageQueryRequest): UsageRecordQuery {
     limit: input.limit
   };
 
+  if (input.cursor !== undefined) query.cursor = input.cursor;
   if (input.route !== undefined) query.route = input.route;
   if (input.model !== undefined) query.model = input.model;
   if (input.pool !== undefined) query.pool = input.pool;
@@ -468,6 +487,7 @@ function toHealthEventQuery(input: HealthEventsQueryRequest): HealthEventQuery {
     limit: input.limit
   };
 
+  if (input.cursor !== undefined) query.cursor = input.cursor;
   if (input.type !== undefined) query.type = input.type;
   if (input.level !== undefined) query.level = input.level;
   if (input.requestId !== undefined) query.requestId = input.requestId;
@@ -483,6 +503,7 @@ function toAuditLogQuery(input: AuditLogsQueryRequest): AuditLogQuery {
     limit: input.limit
   };
 
+  if (input.cursor !== undefined) query.cursor = input.cursor;
   if (input.action !== undefined) query.action = input.action;
   if (input.actorType !== undefined) query.actorType = input.actorType;
   if (input.actorId !== undefined) query.actorId = input.actorId;

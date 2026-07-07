@@ -1,3 +1,5 @@
+import { offsetFromCursor, pageFromItems, type PageQuery, type PaginatedResult } from "./pagination.js";
+
 export type AuditActorType = "admin" | "system";
 
 export interface AuditActor {
@@ -25,8 +27,7 @@ export interface AuditLog {
   createdAt: Date;
 }
 
-export interface AuditLogQuery {
-  limit?: number;
+export interface AuditLogQuery extends PageQuery {
   action?: AuditAction;
   actorType?: AuditActorType;
   actorId?: string;
@@ -35,9 +36,17 @@ export interface AuditLogQuery {
   outcome?: AuditOutcome;
 }
 
+export interface AuditLogStats {
+  total: number;
+  byOutcome: Record<AuditOutcome, number>;
+  byAction: Partial<Record<AuditAction, number>>;
+}
+
 export interface AuditLogRecorder {
   record(entry: Omit<AuditLog, "id" | "createdAt">): Promise<AuditLog>;
   listRecent(query?: AuditLogQuery): Promise<AuditLog[]>;
+  pageRecent(query?: AuditLogQuery): Promise<PaginatedResult<AuditLog>>;
+  getStats(query?: AuditLogQuery): Promise<AuditLogStats>;
 }
 
 export class InMemoryAuditLogRecorder implements AuditLogRecorder {
@@ -65,10 +74,37 @@ export class InMemoryAuditLogRecorder implements AuditLogRecorder {
   }
 
   async listRecent(query: AuditLogQuery = {}): Promise<AuditLog[]> {
+    const page = await this.pageRecent(query);
+    return page.items;
+  }
+
+  async pageRecent(query: AuditLogQuery = {}): Promise<PaginatedResult<AuditLog>> {
     const limit = query.limit ?? 50;
-    return this.entries
+    const offset = offsetFromCursor(query.cursor);
+    const items = this.entries
       .filter((entry) => matchesAuditLogQuery(entry, query))
-      .slice(0, limit);
+      .slice(offset, offset + limit + 1);
+    return pageFromItems(items, limit, offset);
+  }
+
+  async getStats(query: AuditLogQuery = {}): Promise<AuditLogStats> {
+    const entries = this.entries.filter((entry) => matchesAuditLogQuery(entry, query));
+    const byOutcome: Record<AuditOutcome, number> = {
+      success: 0,
+      error: 0
+    };
+    const byAction: Partial<Record<AuditAction, number>> = {};
+
+    for (const entry of entries) {
+      byOutcome[entry.outcome] += 1;
+      byAction[entry.action] = (byAction[entry.action] ?? 0) + 1;
+    }
+
+    return {
+      total: entries.length,
+      byOutcome,
+      byAction
+    };
   }
 }
 

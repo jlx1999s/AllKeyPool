@@ -207,6 +207,41 @@ describe("SQLite storage", () => {
         outcome: "success"
       })
     ]);
+    const firstUsagePage = await usageRecorder.pageRecent({ limit: 1 });
+    expect(firstUsagePage.items).toEqual([
+      expect.objectContaining({
+        requestId: "req-2"
+      })
+    ]);
+    expect(firstUsagePage.page).toMatchObject({
+      limit: 1,
+      hasMore: true,
+      nextCursor: expect.any(String)
+    });
+    const nextUsageCursor = firstUsagePage.page.nextCursor;
+    if (nextUsageCursor === undefined) {
+      throw new Error("Expected next usage cursor");
+    }
+    await expect(usageRecorder.pageRecent({
+      limit: 1,
+      cursor: nextUsageCursor
+    })).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({
+          requestId: "req-1"
+        })
+      ],
+      page: {
+        limit: 1,
+        hasMore: false
+      }
+    });
+    await expect(usageRecorder.getStats()).resolves.toEqual({
+      total: 2,
+      success: 1,
+      error: 1,
+      avgLatencyMs: 10
+    });
     await expect(healthEventRecorder.listRecent()).resolves.toEqual([
       expect.objectContaining({
         type: "provider_attempt_failed",
@@ -234,6 +269,18 @@ describe("SQLite storage", () => {
         level: "info"
       })
     ]);
+    await expect(healthEventRecorder.getStats()).resolves.toEqual({
+      total: 2,
+      byLevel: {
+        info: 1,
+        warn: 1,
+        error: 0
+      },
+      byType: {
+        provider_attempt_failed: 1,
+        provider_attempt_succeeded: 1
+      }
+    });
     await expect(auditLogRecorder.listRecent()).resolves.toEqual([
       expect.objectContaining({
         action: "key_deleted",
@@ -268,6 +315,17 @@ describe("SQLite storage", () => {
         outcome: "success"
       })
     ]);
+    await expect(auditLogRecorder.getStats()).resolves.toEqual({
+      total: 2,
+      byOutcome: {
+        success: 1,
+        error: 1
+      },
+      byAction: {
+        key_created: 1,
+        key_deleted: 1
+      }
+    });
 
     database.close();
   });
