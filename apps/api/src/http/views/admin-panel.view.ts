@@ -422,7 +422,7 @@ ${ADMIN_PANEL_CSS}
                   <option value="" data-i18n="events.filter.allProvider">All providers</option>
                 </select>
                 <div class="search" style="max-width: 280px;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4)"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
                   <input id="requests-key-filter" data-i18n-placeholder="events.filter.keyPlaceholder" placeholder="Filter key id…">
                 </div>
               </div>
@@ -488,7 +488,7 @@ ${ADMIN_PANEL_CSS}
                   <option value="key_status_changed">key_status_changed</option>
                 </select>
                 <div class="search" style="max-width: 280px;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4)"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
                   <input id="health-key-filter" data-i18n-placeholder="events.filter.keyPlaceholder" placeholder="Filter key id…">
                 </div>
               </div>

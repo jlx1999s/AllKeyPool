@@ -230,13 +230,6 @@ export function renderAdminPanelScript(i18n: Record<string, I18nDictionary>): st
         .join("");
       if (s.providers.includes(prevProv)) provFilter.value = prevProv;
 
-      const usageProviderFilter = $("usage-event-provider-filter");
-      const prevUsageProvider = usageProviderFilter.value;
-      usageProviderFilter.innerHTML = ['<option value="">' + t("usage.filter.allProvider") + '</option>']
-        .concat(s.providers.map((p) => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>'))
-        .join("");
-      if (s.providers.includes(prevUsageProvider)) usageProviderFilter.value = prevUsageProvider;
-
       // demo model options
       const models = new Set();
       for (const pool of s.pools || []) {
