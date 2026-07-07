@@ -28,7 +28,6 @@ export function renderAdminPanelRequestsScript(): string {
     async function refreshRequests() {
       try {
         const data = await requestJson("/admin/api/usage" + buildRequestsQueryString());
-        console.log("[demo.requests] data:", JSON.stringify({items: (data.usage || []).length, hasStats: !!data.stats, page: data.page}));
         requestsState.items = data.usage || [];
         requestsState.page = data.page || null;
         requestsState.stats = data.stats || null;
@@ -36,7 +35,6 @@ export function renderAdminPanelRequestsScript(): string {
         renderRequestsTable();
         renderRequestsSummary();
       } catch (err) {
-        console.error("[demo.requests] ERROR:", err);
         toast(t("usage.err.load", { msg: err.message }), "danger");
       }
     }
@@ -80,9 +78,13 @@ export function renderAdminPanelRequestsScript(): string {
     function renderRequestsTable() {
       const tbody = $("requests-body");
       if (!tbody) return;
-      console.log("[demo.requests] renderTable items.length=" + requestsState.items.length);
       if (requestsState.items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><h3>' + escapeHtml(t("usage.events.empty")) + '</h3></div></td></tr>';
+        const total = (requestsState.stats && requestsState.stats.total) || 0;
+        const emptyMsg = total === 0
+          ? '<h3>' + escapeHtml(t("usage.events.emptyNone")) + '</h3>'
+            + '<p>' + escapeHtml(t("usage.events.emptyNoneHint")) + '</p>'
+          : '<h3>' + escapeHtml(t("usage.events.empty")) + '</h3>';
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty">' + emptyMsg + '</div></td></tr>';
         return;
       }
       tbody.innerHTML = requestsState.items.map((entry) => {
