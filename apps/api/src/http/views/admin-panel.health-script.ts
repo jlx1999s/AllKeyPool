@@ -28,15 +28,19 @@ export function renderAdminPanelHealthScript(): string {
     async function refreshHealth() {
       try {
         const data = await requestJson("/admin/api/health-events" + buildHealthQueryString());
-        console.log("[demo.health] data:", JSON.stringify({items: (data.events || []).length, hasStats: !!data.stats}));
+        console.log("[demo.health] data:", JSON.stringify({items: (data.events || []).length, hasStats: !!data.stats, page: data.page}));
         healthState.items = data.events || [];
         healthState.page = data.page || null;
         healthState.stats = data.stats || null;
+        console.log("[demo.health] before renderHealthStats, items=", healthState.items.length);
         renderHealthStats();
-        renderHealthTable();
+        console.log("[demo.health] before renderHealthSummary");
         renderHealthSummary();
+        console.log("[demo.health] before renderHealthTable");
+        renderHealthTable();
+        console.log("[demo.health] DONE all renders");
       } catch (err) {
-        console.error("[demo.health] ERROR:", err);
+        console.error("[demo.health] ERROR:", err, "data:", err && err.body);
         toast(t("usage.err.load", { msg: err.message }), "danger");
       }
     }
@@ -80,6 +84,7 @@ export function renderAdminPanelHealthScript(): string {
     function renderHealthTable() {
       const tbody = $("health-body");
       if (!tbody) return;
+      console.log("[demo.health] renderTable items.length=" + healthState.items.length);
       if (healthState.items.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><h3>' + escapeHtml(t("usage.health.empty")) + '</h3></div></td></tr>';
         return;
